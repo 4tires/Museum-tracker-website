@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <a href="{{ url_for('museums.museums') }}">Return to the list of museums</a>
+  <img src="{{museum.image_url}}" alt="{{museum.name}}" width="100px" height="100px"></img>
+  <h1>{{museum.name}}</h1>
+  <a>Country: {{museum.country}}</a>
+  <a>City: {{museum.city}}</a>
+  <a href="{{museum.website}}">{{museum.website}}</a>
+  <p>{{museum.description}}</p>
+{% endblock %}

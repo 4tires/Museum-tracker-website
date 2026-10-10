@@ -10,7 +10,7 @@ from datetime import date
 from werkzeug.security import generate_password_hash
 
 from app import create_app, db
-from app.models import Museum, User, Visit, VisitStatus
+from app.models import Museum, User, Visit, Review, Wishlist
 
 
 def reset_db():
@@ -91,25 +91,33 @@ def seed_museums():
 
 
 def seed_visits(users, museums):
-    # Visit has a unique (user_id, museum_id) constraint, so look up by both.
+    # Visit has a unique (user_id, museum_id, visit_date) constraint, so look up by both.
     get_or_create(
         Visit,
         user_id=users["alice"].id,
         museum_id=1,
-        defaults={
-            "status": VisitStatus.VISITED,
-            "visit_date": date(2026, 5, 1),
-            "rating": 4,
-            "review": "Placeholder review.",
-        },
-    )
-    get_or_create(
-        Visit,
-        user_id=users["alice"].id,
-        museum_id=2,
-        defaults={"status": VisitStatus.WANT_TO_VISIT},
+        visit_date=date(2026, 5, 1)
     )
 
+def seed_wishs(users, museums):
+    # Wish has a unique (user_id, museum_id) constraint, so look up by both.
+    get_or_create(
+        Wishlist,
+        user_id=users["alice"].id,
+        museum_id=2,
+    )
+
+def seed_reviews(users, museums):
+    # Review has a unique (user_id, museum_id) constraint, so look up by both.
+    get_or_create(
+        Review,
+        user_id=users["alice"].id,
+        museum_id=1,
+        defaults={
+            "rating": 4,
+            "review": "Great collection, go early to avoid the crowds."
+        }
+    )
 
 def main():
     app = create_app()
@@ -122,6 +130,8 @@ def main():
         # New rows have no id until they are flushed to the database.
         db.session.flush()
         seed_visits(users, museums)
+        seed_wishs(users, museums)
+        seed_reviews(users, museums)
 
         db.session.commit()
         print("Seeding done.")

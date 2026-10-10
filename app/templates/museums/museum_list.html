@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>Museums</h1>
+  {% for m in museums %}
+  <p class="museum_row">
+    <img src="{{m.image_url}}" alt="{{m.name}}" width="100px" height="100px"></img>
+    <a href="{{ url_for('museums.museum', museum_id=m.id) }}">{{m.name}}</a>
+  </p>
+  {% endfor %}
+{% endblock %}
