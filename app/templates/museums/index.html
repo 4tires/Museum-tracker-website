@@ -3,4 +3,10 @@
 {% block content %}
   <h1>Museums</h1>
   {# TODO: loop over museums #}
+  {% for m in museums %}
+  <p class="museum_row">
+    <img src="{{m.image_url}}" alt="{{m.name}}" width="100px" height="100px"></img>
+    <span>{{m.name}}</span>
+  </p>
+  {% endfor %}
 {% endblock %}

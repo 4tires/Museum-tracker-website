@@ -71,7 +71,7 @@ def seed_museums():
             "country": "Portugal",
             "description": "Situado na antiga prisão do Aljube que, entre 1928 e 1965, funcionou como cárcere político do Estado Novo, tem como missão a preservação da memória do combate à ditadura e daqueles que lutaram pela liberdade e democracia.",
             "website": "https://www.museudoaljube.pt/en/",
-            "image_url": "https://www.museudoaljube.pt/wp-content/themes/museudoaljube/assets/images/logo-museudoaljube.svg"
+            "image_url": "https://europeanmemories.net/wp-content/uploads/sites/19/2016/09/images.png"
         },
         {
             "name": "Museu Nacional dos Coches",
@@ -79,7 +79,7 @@ def seed_museums():
             "country": "Portugal",
             "description": "O Museu Nacional dos Coches reúne uma coleção única no mundo de viaturas de gala e de passeio dos séculos XVI a XIX, na sua maioria provenientes da Casa Real Portuguesa, a que se acrescentaram veículos vindos dos bens da Igreja e de coleções particulares.",
             "website": "https://www.mncoches.gov.pt/en",
-            "image_url": "https://api.mncoches.pt/uploads/museu_coches_logo_dc5befdac9.png"
+            "image_url": "https://media.timeout.com/images/103703334/750/422/image.jpg"
         },
     ]
     result = {}
