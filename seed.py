@@ -1,24 +1,27 @@
-"""Barebones seed script.
+"""Seed script.
 
 Run with:
     python seed.py            # add seed data (skips anything that already exists)
     python seed.py --reset    # drop and recreate all tables first, then seed
-
-Adjust the imports and fields below to match your own app and models.
 """
 import sys
+from datetime import date
 
-# TODO: change these imports to match your project layout
+from werkzeug.security import generate_password_hash
+
 from app import create_app, db
-from app.models import User, Museum
+from app.models import Museum, User, Visit, VisitStatus
 
 
 def reset_db():
-    """Wipe all tables. Fine for early development with SQLite."""
+    """Wipe all tables. Fine for early development with SQLite.
+
+    Note: create_all() bypasses Alembic, so the alembic_version table is not
+    touched. If you want the schema to come from migrations, delete museums.db
+    and run `flask db upgrade` instead of using --reset.
+    """
     db.drop_all()
     db.create_all()
-    # If you use Flask-Migrate, you may prefer deleting the .db file and
-    # running `flask db upgrade` instead of create_all().
 
 
 def get_or_create(model, defaults=None, **lookup):
@@ -35,24 +38,77 @@ def get_or_create(model, defaults=None, **lookup):
 
 
 def seed_users():
-    # TODO: match your User fields (and hash the password the way your app does)
+    # Development-only passwords. Never reuse these anywhere real.
     admin = get_or_create(
         User,
-        username="paulo",
-        defaults={"email": "paulo@example.com", "is_admin": True},
+        username="admin",
+        defaults={
+            "first_name": "admin",
+            "last_name": "admin",
+            "email": "admin@example.com",
+            "password_hash": generate_password_hash("change-me"),
+            "is_admin": True,
+        },
     )
-    # admin.set_password("change-me")  # if your model has a helper like this
-    return {"admin": admin}
+    alice = get_or_create(
+        User,
+        username="alice",
+        defaults={
+            "first_name": "Alice",
+            "last_name": "Ficticio",
+            "email": "alice@example.com",
+            "password_hash": generate_password_hash("change-me"),
+        },
+    )
+    return {"admin": admin, "alice": alice}
 
 
 def seed_museums():
-    # TODO: match your Museum fields
     museums = [
-        {"name": "Museum One", "city": "Lisbon", "country": "Portugal"},
-        {"name": "Museum Two", "city": "Leiden", "country": "Netherlands"},
+        {
+            "name": "Museu do Aljube – Resistência e Liberdade",
+            "city": "Lisbon",
+            "country": "Portugal",
+            "description": "Situado na antiga prisão do Aljube que, entre 1928 e 1965, funcionou como cárcere político do Estado Novo, tem como missão a preservação da memória do combate à ditadura e daqueles que lutaram pela liberdade e democracia.",
+            "website": "https://www.museudoaljube.pt/en/",
+            "image_url": "https://www.museudoaljube.pt/wp-content/themes/museudoaljube/assets/images/logo-museudoaljube.svg"
+        },
+        {
+            "name": "Museu Nacional dos Coches",
+            "city": "Lisbon",
+            "country": "Portugal",
+            "description": "O Museu Nacional dos Coches reúne uma coleção única no mundo de viaturas de gala e de passeio dos séculos XVI a XIX, na sua maioria provenientes da Casa Real Portuguesa, a que se acrescentaram veículos vindos dos bens da Igreja e de coleções particulares.",
+            "website": "https://www.mncoches.gov.pt/en",
+            "image_url": "https://api.mncoches.pt/uploads/museu_coches_logo_dc5befdac9.png"
+        },
     ]
+    result = {}
     for data in museums:
-        get_or_create(Museum, name=data["name"], defaults=data)
+        name = data["name"]
+        defaults = {k: v for k, v in data.items() if k != "name"}
+        result[name] = get_or_create(Museum, name=name, defaults=defaults)
+    return result
+
+
+def seed_visits(users, museums):
+    # Visit has a unique (user_id, museum_id) constraint, so look up by both.
+    get_or_create(
+        Visit,
+        user_id=users["alice"].id,
+        museum_id=1,
+        defaults={
+            "status": VisitStatus.VISITED,
+            "visit_date": date(2026, 5, 1),
+            "rating": 4,
+            "review": "Placeholder review.",
+        },
+    )
+    get_or_create(
+        Visit,
+        user_id=users["alice"].id,
+        museum_id=2,
+        defaults={"status": VisitStatus.WANT_TO_VISIT},
+    )
 
 
 def main():
@@ -61,9 +117,11 @@ def main():
         if "--reset" in sys.argv:
             reset_db()
 
-        seed_users()
-        seed_museums()
-        # TODO: add seed_reviews() etc. as you add models
+        users = seed_users()
+        museums = seed_museums()
+        # New rows have no id until they are flushed to the database.
+        db.session.flush()
+        seed_visits(users, museums)
 
         db.session.commit()
         print("Seeding done.")
