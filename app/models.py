@@ -75,7 +75,8 @@ class Exhibition(db.Model):
             "start_date IS NULL OR end_date IS NULL OR start_date <= end_date",
             name="ck_exhibition_date_range",
         ),
-        CheckConstraint("NOT is_permanent OR end_date IS NULL", name="ck_permanent_wth_date")
+        CheckConstraint("NOT is_permanent OR end_date IS NULL", name="ck_permanent_wth_date"),
+        UniqueConstraint("museum_id", "name", name="uq_exhibition_museum_name")
     )
 
     # Relationships
