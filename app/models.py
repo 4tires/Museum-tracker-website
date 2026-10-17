@@ -86,9 +86,9 @@ class Exhibition(db.Model):
     )
 
 
-# TO DO: Think about museum visits or exhibition visits
-class Visit(db.Model):
-    __tablename__ = "visits"
+# Museum tables
+class MuseumVisit(db.Model):
+    __tablename__ = "museum_visits"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
@@ -101,11 +101,11 @@ class Visit(db.Model):
     )
 
     # Relationships
-    user: Mapped["User"] = relationship(backref="visits")
-    museum: Mapped["Museum"] = relationship(backref="visits")
+    user: Mapped["User"] = relationship(backref="museum_visits")
+    museum: Mapped["Museum"] = relationship(backref="museum_visits")
 
-class Wishlist(db.Model):
-    __tablename__ = "wishlist"
+class MuseumWishlist(db.Model):
+    __tablename__ = "museum_wishlist"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
@@ -117,11 +117,11 @@ class Wishlist(db.Model):
     )
 
     # Relationships
-    user: Mapped["User"] = relationship(backref="wishlist")
-    museum: Mapped["Museum"] = relationship(backref="wishlist")
+    user: Mapped["User"] = relationship(backref="museum_wishlist")
+    museum: Mapped["Museum"] = relationship(backref="museum_wishlist")
 
-class Review(db.Model):
-    __tablename__ = "reviews"
+class MuseumReview(db.Model):
+    __tablename__ = "museum_reviews"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
@@ -143,8 +143,68 @@ class Review(db.Model):
     )
 
     # Relationships
-    user: Mapped["User"] = relationship(backref="reviews")
-    museum: Mapped["Museum"] = relationship(backref="reviews")
+    user: Mapped["User"] = relationship(backref="museum_reviews")
+    museum: Mapped["Museum"] = relationship(backref="museum_reviews")
+
+# Exhibition tables
+class ExhibitionVisit(db.Model):
+    __tablename__ = "exhibition_visits"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
+    exhibition_id: Mapped[int] = mapped_column(ForeignKey("exhibition.id"))
+    visit_date: Mapped[date] = mapped_column()
+
+    # Unique rows with [user, exhibition]
+    __table_args__ = (
+        UniqueConstraint("user_id", "exhibition_id", "visit_date", name="uq_user_exhibition_visit"),
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(backref="exhibition_visits")
+    exhibition: Mapped["Exhibition"] = relationship(backref="exhibition_visits")
+
+class ExhibitionWishlist(db.Model):
+    __tablename__ = "exhibition_wishlist"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
+    exhibition_id: Mapped[int] = mapped_column(ForeignKey("exhibition.id"))
+
+    # Unique rows with [user, exhibition]
+    __table_args__ = (
+        UniqueConstraint("user_id", "exhibition_id", name="uq_user_exhibition_wish"),
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(backref="exhibition_wishlist")
+    exhibition: Mapped["Exhibition"] = relationship(backref="exhibition_wishlist")
+
+class ExhibitionReview(db.Model):
+    __tablename__ = "exhibition_reviews"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
+    exhibition_id: Mapped[int] = mapped_column(ForeignKey("exhibition.id"))
+    rating: Mapped[Optional[int]] = mapped_column(default=None)
+    review: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    # Unique rows with [user, exhibition] and rating check
+    __table_args__ = (
+        UniqueConstraint("user_id", "exhibition_id", name="uq_user_exhibition_review"),
+        CheckConstraint("rating BETWEEN 1 AND 10", name="ck_review_rating_range"),
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(backref="exhibition_reviews")
+    exhibition: Mapped["Exhibition"] = relationship(backref="exhibition_reviews")
 
 class MuseumPass(db.Model):
     __tablename__ = "passes"

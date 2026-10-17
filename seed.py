@@ -10,7 +10,7 @@ from datetime import date
 from werkzeug.security import generate_password_hash
 
 from app import create_app, db
-from app.models import Museum, User, Visit, Review, Wishlist
+from app.models import Museum, User, MuseumVisit, MuseumReview, MuseumWishlist, ExhibitionVisit, ExhibitionReview, ExhibitionWishlist
 
 
 def reset_db():
@@ -132,6 +132,10 @@ def main():
         seed_visits(users, museums)
         seed_wishs(users, museums)
         seed_reviews(users, museums)
+        seed_exhibitions()
+
+
+
 
         db.session.commit()
         print("Seeding done.")
