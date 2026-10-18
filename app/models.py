@@ -1,11 +1,13 @@
-from datetime import datetime, date, timezone
-from decimal import Decimal
-from flask_login import UserMixin
-from typing import Optional
-from sqlalchemy import String, Text, ForeignKey, UniqueConstraint, CheckConstraint, Numeric, Table, Column
+from sqlalchemy import String, Text, ForeignKey, UniqueConstraint, CheckConstraint, Numeric, Table, Column, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from flask_login import UserMixin
 
 from .extensions import db, login_manager
+
+from datetime import datetime, date, timezone
+from decimal import Decimal
+from typing import Optional
+import enum
 
 class User(UserMixin, db.Model):
     __tablename__ = "user_account"
@@ -58,13 +60,15 @@ class Museum(db.Model):
     )
 
 class Exhibition(db.Model):
-    __tablename__ = "exhibitions"
+    __tablename__ = "exhibition"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     museum_id: Mapped[int] = mapped_column(ForeignKey("museum.id"))
     name: Mapped[str] = mapped_column(String(200))
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    short_description: Mapped[Optional[str]] = mapped_column(Text)
+    long_description: Mapped[Optional[str]] = mapped_column(Text)
     website: Mapped[Optional[str]] = mapped_column(String(254))
+    image_url: Mapped[Optional[str]] = mapped_column(String(254))
     is_permanent: Mapped[bool] = mapped_column(default=False)
     start_date: Mapped[Optional[date]]
     end_date: Mapped[Optional[date]]
@@ -139,7 +143,7 @@ class MuseumReview(db.Model):
     # Unique rows with [user, museum] and rating check
     __table_args__ = (
         UniqueConstraint("user_id", "museum_id", name="uq_user_museum_review"),
-        CheckConstraint("rating BETWEEN 1 AND 10", name="ck_review_rating_range"),
+        CheckConstraint("rating BETWEEN 1 AND 10", name="ck_museum_review_rating_range"),
     )
 
     # Relationships
@@ -199,7 +203,7 @@ class ExhibitionReview(db.Model):
     # Unique rows with [user, exhibition] and rating check
     __table_args__ = (
         UniqueConstraint("user_id", "exhibition_id", name="uq_user_exhibition_review"),
-        CheckConstraint("rating BETWEEN 1 AND 10", name="ck_review_rating_range"),
+        CheckConstraint("rating BETWEEN 1 AND 10", name="ck_exhibition_review_rating_range"),
     )
 
     # Relationships
@@ -216,11 +220,11 @@ class MuseumPass(db.Model):
 
     # Relationships
     prices: Mapped[list["PassPrice"]] = relationship(
-        back_populates="museum_pass", passive_deletes="True"
+        back_populates="museum_pass", passive_deletes=True
     )
 
     tickets: Mapped[list["Ticket"]] = relationship(
-        back_populates="passes", passive_deletes="all"
+        back_populates="museum_pass", passive_deletes="all"
     )
 
     # Repr
@@ -234,12 +238,22 @@ class AudienceConditionsMixin:
     min_age: Mapped[Optional[int]]
     max_age: Mapped[Optional[int]]
 
+class DurationUnit(enum.Enum):
+    hours = "hours"
+    days = "days"
+    months = "months"
+    years = "years"
+
 class PassPrice(AudienceConditionsMixin, db.Model):
     __tablename__ = "pass_prices"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     pass_id: Mapped[int] = mapped_column(ForeignKey("passes.id", ondelete="CASCADE"))
     label: Mapped[str] = mapped_column(String(100))  # "Adult", "Child 5-12", ...
+    duration_unit: Mapped[DurationUnit] = mapped_column(
+        Enum(DurationUnit, native_enum=False, create_constraint=True, name="duration_unit")
+    )
+    duration_value: Mapped[int]
     price: Mapped[Decimal] = mapped_column(Numeric(8, 2))
     currency: Mapped[str] = mapped_column(String(3), default="EUR")
     notes: Mapped[Optional[str]] = mapped_column(Text)
@@ -250,7 +264,9 @@ class PassPrice(AudienceConditionsMixin, db.Model):
             "min_age IS NULL OR max_age IS NULL OR min_age <= max_age",
             name="ck_pass_price_age_range",
         ),
-        CheckConstraint("min_age IS NULL OR min_age >= 0", name="ck_min_age")
+        CheckConstraint("min_age IS NULL OR min_age >= 0", name="ck_pass_price_min_age"),
+        CheckConstraint("duration_value > 0", name="ck_pass_price_duration_positive"),
+        UniqueConstraint("pass_id", "label", "duration_value", "duration_unit", name="uq_pass_price_label"),
     )
 
     museum_pass: Mapped["MuseumPass"] = relationship(back_populates="prices")
@@ -273,7 +289,7 @@ class Ticket(AudienceConditionsMixin, db.Model):
             "min_age IS NULL OR max_age IS NULL OR min_age <= max_age",
             name="ck_ticket_age_range",
         ),
-        CheckConstraint("min_age IS NULL OR min_age >= 0", name="ck_min_age")
+        CheckConstraint("min_age IS NULL OR min_age >= 0", name="ck_ticket_min_age")
     )
 
     # Relationships
@@ -288,7 +304,7 @@ ticket_exhibition = Table(
     "ticket_exhibition",
     db.metadata,
     Column("ticket_id", ForeignKey("tickets.id"), primary_key=True),
-    Column("exhibition_id", ForeignKey("exhibitions.id"), primary_key=True),
+    Column("exhibition_id", ForeignKey("exhibition.id"), primary_key=True),
 )
 
 @login_manager.user_loader
