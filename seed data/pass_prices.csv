@@ -1,0 +1,16 @@
+﻿pass_name;label;duration_unit;duration_value;price;currency;notes;resident_country;resident_municipality;min_age;max_age;is_student
+Lisboa Card;Adult - 24h;hours;24;31;EUR;;;;16;;
+Lisboa Card;Child - 24h;hours;24;21;EUR;;;;4;15;
+Lisboa Card;Adult - 48h;hours;48;51;EUR;;;;16;;
+Lisboa Card;Child - 48h;hours;48;28;EUR;;;;4;15;
+Lisboa Card;Adult - 72h;hours;72;62;EUR;;;;16;;
+Lisboa Card;Child - 72h;hours;72;35;EUR;;;;4;15;
+Combinado: Jerónimos, Coches e Ajuda;Adult;days;1;40;EUR;;;;25;;
+Combinado: Jerónimos, Coches e Ajuda;Young;days;1;20;EUR;;;;13;24;
+Combinado: Jerónimos, Coches e Ajuda;Senior;days;1;20;EUR;;;;65;;
+Combinado: Jerónimos e Coches;Adult;days;1;30;EUR;;;;25;;
+Combinado: Jerónimos e Coches;Young;days;1;15;EUR;;;;13;24;
+Combinado: Jerónimos e Coches;Senior;days;1;15;EUR;;;;65;;
+Combinado: Lisboa real;Adult;days;1;25;EUR;;;;25;;
+Combinado: Lisboa real;Young;days;1;12,5;EUR;;;;13;24;
+Combinado: Lisboa real;Senior;days;1;12,5;EUR;;;;65;;

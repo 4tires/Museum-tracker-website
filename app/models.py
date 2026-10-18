@@ -237,6 +237,7 @@ class AudienceConditionsMixin:
     resident_municipality: Mapped[Optional[str]] = mapped_column(String(100))
     min_age: Mapped[Optional[int]]
     max_age: Mapped[Optional[int]]
+    is_student: Mapped[bool] = mapped_column(default=False)
 
 class DurationUnit(enum.Enum):
     hours = "hours"
