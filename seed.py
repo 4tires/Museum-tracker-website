@@ -13,7 +13,6 @@ from decimal import Decimal
 from werkzeug.security import generate_password_hash
 
 from app import create_app, db
-from app.models import Museum, User, Exhibition, MuseumVisit, MuseumReview, MuseumWishlist, ExhibitionVisit, ExhibitionReview, ExhibitionWishlist, MuseumPass, PassPrice, Ticket, DurationUnit
 
 # Database Logic
 def reset_db():
@@ -126,19 +125,18 @@ def seed_exhibitions(museums):
     result = {}
     for row in read_rows("exhibitions.csv"):
         museum = museums[(row["museum_name"], row["museum_city"])]
-        museum_id = museum.id
-
-        name = row.pop("exhibition_name")
 
         row.pop("museum_name")
         row.pop("museum_city")
+
+        name = row.pop("exhibition_name")
 
         row["is_permanent"] = parse_bool(row["is_permanent"]),
         row["start_date"] = parse_date(row["start_date"]),
         row["end_date"] = parse_date(row["end_date"]),
 
         result[(museum_id, name)] = get_or_create(
-            Exhibition, museum_id=museum_id, name=name, defaults=row
+            Exhibition, museum_id=museum.id, name=name, defaults=row
         )
     return result
 
@@ -204,7 +202,11 @@ def seed_pass_prices(museum_passes):
 def seed_tickets(museums, museum_passes):
     result = {}
     for row in read_rows("tickets.csv"):
-        museum = museums[row.pop("museum_name")]
+        museum = museums[(row["museum_name"], row["museum_city"])]
+
+        row.pop("museum_name")
+        row.pop("museum_city")
+
         label = row.pop("label")
 
         row["price"] = Decimal(row["price"])
@@ -212,7 +214,7 @@ def seed_tickets(museums, museum_passes):
         row["max_age"] = parse_int(row["max_age"])
         row["is_student"] = parse_bool(row["is_student"])
 
-        result[(museum.id, label)] = get_or_create(Ticket, museum_id=museum_id, label=label, defaults=row)
+        result[(museum.id, label)] = get_or_create(Ticket, museum_id=museum.id, label=label, defaults=row)
 
     return result
 

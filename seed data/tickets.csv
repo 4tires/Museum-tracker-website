@@ -1,21 +1,22 @@
-﻿museum_name;label;price;currency;notes;pass_name;resident_country;resident_municipality;min_age;max_age;is_student
-Museu do Aljube – Resistência e Liberdade;Standard;4;EUR;;;;;;;
-Museu do Aljube – Resistência e Liberdade;Senior;2,8;EUR;;;;;65;;
-Museu do Aljube – Resistência e Liberdade;Young;2;EUR;;;;;13;25;
-Museu do Aljube – Resistência e Liberdade;Child;0;EUR;;;;;;12;
-Museu do Aljube – Resistência e Liberdade;Young resident in municipality;0;EUR;;;;Lisbon;13;23;
-Museu do Aljube – Resistência e Liberdade;Senior resident in municipality;0;EUR;;;;Lisbon;65;;
-Museu do Aljube – Resistência e Liberdade;Lisboa Card;0;EUR;;Lisboa Card;;;;;
-Museu Nacional dos Coches;Adult;15;EUR;;;;;;;
-Museu Nacional dos Coches;Child;0;EUR;;;;;;12;
-Museu Nacional dos Coches;Young;7,5;EUR;;;;;13;24;
-Museu Nacional dos Coches;Senior;7,5;EUR;;;;;65;;
-Museu Nacional dos Coches;Lisboa Card;0;EUR;;Lisboa Card;;;;;
-Museu Nacional dos Coches;Combinado: Jerónimos, Coches e Ajuda;0;EUR;;Combinado: Jerónimos, Coches e Ajuda;;;;;
-Museu Nacional dos Coches;Combinado: Jerónimos e Coches;0;EUR;;Combinado: Jerónimos e Coches;;;;;
-Museu Nacional dos Coches;Combinado: Lisboa real;0;EUR;;Combinado: Lisboa real;;;;;
-Museu do Oriente;Standard;10;EUR;;;;;;;
-Museu do Oriente;Child;3;EUR;;;;;6;12;
-Museu do Oriente;Student;3,5;EUR;;;;;;;1
-Museu do Oriente;Senior;4,5;EUR;;;;;65;;
-Museu do Oriente;Lisboa Card;8;EUR;;Lisboa Card;;;;;
+﻿museum_name;museum_city;label;price;currency;notes;pass_name;resident_country;resident_municipality;min_age;max_age;is_student
+Museu do Aljube – Resistência e Liberdade;Lisbon;Standard;4;EUR;;;;;;;
+Museu do Aljube – Resistência e Liberdade;Lisbon;Senior;2,8;EUR;;;;;65;;
+Museu do Aljube – Resistência e Liberdade;Lisbon;Young;2;EUR;;;;;13;25;
+Museu do Aljube – Resistência e Liberdade;Lisbon;Child;0;EUR;;;;;;12;
+Museu do Aljube – Resistência e Liberdade;Lisbon;Young resident in municipality;0;EUR;;;;Lisbon;13;23;
+Museu do Aljube – Resistência e Liberdade;Lisbon;Senior resident in municipality;0;EUR;;;;Lisbon;65;;
+Museu do Aljube – Resistência e Liberdade;Lisbon;Lisboa Card;0;EUR;;Lisboa Card;;;;;
+Museu Nacional dos Coches;Lisbon;Adult;15;EUR;;;;;;;
+Museu Nacional dos Coches;Lisbon;Child;0;EUR;;;;;;12;
+Museu Nacional dos Coches;Lisbon;Young;7,5;EUR;;;;;13;24;
+Museu Nacional dos Coches;Lisbon;Senior;7,5;EUR;;;;;65;;
+Museu Nacional dos Coches;Lisbon;Lisboa Card;0;EUR;;Lisboa Card;;;;;
+Museu Nacional dos Coches;Lisbon;Combinado: Jerónimos, Coches e Ajuda;0;EUR;;Combinado: Jerónimos, Coches e Ajuda;;;;;
+Museu Nacional dos Coches;Lisbon;Combinado: Jerónimos e Coches;0;EUR;;Combinado: Jerónimos e Coches;;;;;
+Museu Nacional dos Coches;Lisbon;Combinado: Lisboa real;0;EUR;;Combinado: Lisboa real;;;;;
+Museu do Oriente;Lisbon;Standard;10;EUR;;;;;;;
+Museu do Oriente;Lisbon;Child;3;EUR;;;;;6;12;
+Museu do Oriente;Lisbon;Student;3,5;EUR;;;;;;;1
+Museu do Oriente;Lisbon;Senior;4,5;EUR;;;;;65;;
+Museu do Oriente;Lisbon;Lisboa Card;8;EUR;;Lisboa Card;;;;;
+Museu do Oriente;Lisbon;Baby;0;EUR;;;;;;5;
