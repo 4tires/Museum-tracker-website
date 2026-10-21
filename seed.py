@@ -7,11 +7,12 @@ Run with:
 import sys
 import csv
 from pathlib import Path
-from datetime import date
+from datetime import date, time
 from decimal import Decimal
 
 from werkzeug.security import generate_password_hash
 
+from app.models import Museum, User, Exhibition, MuseumVisit, MuseumReview, MuseumWishlist, ExhibitionVisit, ExhibitionReview, ExhibitionWishlist, MuseumPass, PassPrice, Ticket, DurationUnit, Weekday, FreeAccessRule
 from app import create_app, db
 
 # Database Logic
@@ -57,6 +58,9 @@ def parse_date(v):
 def parse_int(v):
     return int(v) if v else None
 
+def parse_time(v):
+    return time.fromisoformat(v) if v else None
+
 # Seed functions
 def seed_users():
     # Development-only passwords. Never reuse these anywhere real.
@@ -94,27 +98,33 @@ def seed_museums():
 
 def seed_museum_visits(users, museums):
     # Visit has a unique (user_id, museum_id, visit_date) constraint, so look up by both.
+    museum = museums[("Museu do Aljube – Resistência e Liberdade", "Lisbon")]
+
     get_or_create(
         MuseumVisit,
         user_id=users["alice"].id,
-        museum_id=museums["Museu do Aljube – Resistência e Liberdade"].id,
+        museum_id=museum.id,
         visit_date=date(2026, 5, 1)
     )
 
 def seed_museum_wishs(users, museums):
     # Wish has a unique (user_id, museum_id) constraint, so look up by both.
+    museum = museums[("Museu Nacional dos Coches", "Lisbon")]
+
     get_or_create(
         MuseumWishlist,
         user_id=users["alice"].id,
-        museum_id=museums["Museu Nacional dos Coches"].id,
+        museum_id=museum.id,
     )
 
 def seed_museum_reviews(users, museums):
     # Review has a unique (user_id, museum_id) constraint, so look up by both.
+    museum = museums[("Museu do Aljube – Resistência e Liberdade", "Lisbon")]
+
     get_or_create(
         MuseumReview,
         user_id=users["alice"].id,
-        museum_id=museums["Museu do Aljube – Resistência e Liberdade"].id,
+        museum_id=museum.id,
         defaults={
             "rating": 4,
             "review": "Great collection, go early to avoid the crowds."
@@ -131,11 +141,11 @@ def seed_exhibitions(museums):
 
         name = row.pop("exhibition_name")
 
-        row["is_permanent"] = parse_bool(row["is_permanent"]),
-        row["start_date"] = parse_date(row["start_date"]),
-        row["end_date"] = parse_date(row["end_date"]),
+        row["is_permanent"] = parse_bool(row["is_permanent"])
+        row["start_date"] = parse_date(row["start_date"])
+        row["end_date"] = parse_date(row["end_date"])
 
-        result[(museum_id, name)] = get_or_create(
+        result[(museum.id, name)] = get_or_create(
             Exhibition, museum_id=museum.id, name=name, defaults=row
         )
     return result
@@ -173,7 +183,7 @@ def seed_museum_pass():
     result = {}
     for row in read_rows("museum_passes.csv"):
         name = row.pop("name")
-        result[(name, city)] = get_or_create(
+        result[name] = get_or_create(
             MuseumPass, name=name, defaults=row
         )
     return result
@@ -209,6 +219,9 @@ def seed_tickets(museums, museum_passes):
 
         label = row.pop("label")
 
+        pass_name = row.pop("pass_name", None)
+        row["pass_id"] = museum_passes[pass_name].id if pass_name else None
+
         row["price"] = Decimal(row["price"])
         row["min_age"] = parse_int(row["min_age"])
         row["max_age"] = parse_int(row["max_age"])
@@ -227,6 +240,28 @@ def seed_ticket_exhibition(tickets, exhibitions, museums):
         if exhibition not in ticket.exhibitions:
             ticket.exhibitions.append(exhibition)
 
+def seed_free_access_rules(museums):
+    for row in read_rows("free_access_rules.csv"):
+        museum = museums[(row["museum_name"], row["museum_city"])]
+
+        row.pop("museum_name")
+        row.pop("museum_city")
+
+        notes = row.pop("notes", None)
+
+        row["weekday"] = Weekday[row["weekday"]] if row["weekday"] else None
+        row["start_time"] = parse_time(row["start_time"])
+        row["end_time"] = parse_time(row["end_time"])
+        row["month"] = parse_int(row["month"])
+        row["day"] = parse_int(row["day"])
+        row["holidays"] = parse_bool(row["holidays"])
+        row["includes_temporary_exhibitions"] = parse_bool(row["includes_temporary_exhibitions"])
+        row["min_age"] = parse_int(row["min_age"])
+        row["max_age"] = parse_int(row["max_age"])
+        row["is_student"] = parse_bool(row["is_student"])
+
+        get_or_create(FreeAccessRule, museum_id=museum.id, defaults={"notes": notes}, **row)
+
 def main():
     app = create_app()
     with app.app_context():
@@ -235,7 +270,7 @@ def main():
 
         users = seed_users()
         museums = seed_museums()
-        exhibitions = seed_exhibitions()
+        exhibitions = seed_exhibitions(museums)
         museum_passes = seed_museum_pass()
         tickets = seed_tickets(museums, museum_passes)
         seed_museum_visits(users, museums)
@@ -246,6 +281,7 @@ def main():
         seed_exhibition_reviews(users, exhibitions)
         seed_pass_prices(museum_passes)
         seed_ticket_exhibition(tickets, exhibitions, museums)
+        seed_free_access_rules(museums)
 
         db.session.commit()
         print("Seeding done.")

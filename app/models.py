@@ -1,10 +1,10 @@
-from sqlalchemy import String, Text, ForeignKey, UniqueConstraint, CheckConstraint, Numeric, Table, Column, Enum
+from sqlalchemy import String, Text, ForeignKey, UniqueConstraint, CheckConstraint, Numeric, Table, Column, Enum, Integer, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from flask_login import UserMixin
 
 from .extensions import db, login_manager
 
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, time
 from decimal import Decimal
 from typing import Optional
 import enum
@@ -57,6 +57,10 @@ class Museum(db.Model):
     )
     exhibitions: Mapped[list["Exhibition"]] = relationship(
         back_populates="museum", cascade="all, delete-orphan"
+    )
+
+    free_access_rules: Mapped[list["FreeAccessRule"]] = relationship(
+    back_populates="museum", cascade="all, delete-orphan"
     )
 
 class Exhibition(db.Model):
@@ -307,6 +311,57 @@ ticket_exhibition = Table(
     Column("ticket_id", ForeignKey("tickets.id"), primary_key=True),
     Column("exhibition_id", ForeignKey("exhibition.id"), primary_key=True),
 )
+
+class Weekday(enum.IntEnum):
+    MONDAY = 0
+    TUESDAY = 1
+    WEDNESDAY = 2
+    THURSDAY = 3
+    FRIDAY = 4
+    SATURDAY = 5
+    SUNDAY = 6
+
+class FreeAccessRule(AudienceConditionsMixin, db.Model):
+    __tablename__ = "free_access_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    museum_id: Mapped[int] = mapped_column(ForeignKey("museum.id", ondelete="CASCADE"))
+
+    # Free type of rules
+    ## Free on day of the week
+    weekday: Mapped[Optional[int]] = mapped_column(Integer)
+    start_time: Mapped[Optional[time]] = mapped_column(Time)
+    end_time: Mapped[Optional[time]] = mapped_column(Time)
+
+    ## Free on annual date
+    month: Mapped[Optional[int]]
+    day: Mapped[Optional[int]]
+
+    ## Free on holidays
+    holidays: Mapped[bool] = mapped_column(default=False)
+
+    # What it covers
+    includes_temporary_exhibitions: Mapped[bool] = mapped_column(default=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "(weekday IS NOT NULL AND month IS NULL AND day IS NULL AND NOT holidays) "
+            "OR (weekday IS NULL AND month IS NOT NULL AND day IS NOT NULL AND NOT holidays) "
+            "OR (weekday IS NULL AND month IS NULL AND day IS NULL AND holidays)",
+            name="ck_free_rule_kind",
+        ),
+        CheckConstraint("weekday IS NULL OR weekday BETWEEN 0 AND 6", name="ck_free_rule_weekday"),
+        CheckConstraint("month IS NULL OR month BETWEEN 1 AND 12", name="ck_free_rule_month"),
+        CheckConstraint("day IS NULL OR day BETWEEN 1 AND 31", name="ck_free_rule_day"),
+        CheckConstraint(
+            "start_time IS NULL OR end_time IS NULL OR start_time < end_time",
+            name="ck_free_rule_time_range",
+        ),
+    )
+
+    museum: Mapped["Museum"] = relationship(back_populates="free_access_rules")
 
 @login_manager.user_loader
 def load_user(user_id):
