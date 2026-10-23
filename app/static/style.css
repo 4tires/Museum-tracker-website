@@ -4,3 +4,36 @@ body {
   margin: 0 auto;
   padding: 1rem;
 }
+
+.muted { color: #666; }
+
+.museum-header {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.museum-cover {
+  width: 12rem;
+  height: 9rem;
+  object-fit: cover;
+  border-radius: 0.5rem;
+}
+
+.museum-location { margin: 0; color: #666; }
+
+.museum-details { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
+.museum-details dt { font-weight: 600; }
+.museum-details dd { margin: 0; }
+
+.exhibition-list { padding-left: 1.25rem; }
+.exhibition-list li { margin-bottom: 0.75rem; }
+
+.ticket-table { border-collapse: collapse; width: 100%; }
+.ticket-table th, .ticket-table td { text-align: left; padding: 0.4rem 0.75rem; border-bottom: 1px solid #ddd; }
+
+@media (max-width: 600px) {
+  .museum-header { flex-direction: column; align-items: flex-start; }
+  .museum-cover { width: 100%; height: auto; }
+}

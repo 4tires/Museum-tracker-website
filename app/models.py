@@ -59,10 +59,6 @@ class Museum(db.Model):
         back_populates="museum", cascade="all, delete-orphan"
     )
 
-    free_access_rules: Mapped[list["FreeAccessRule"]] = relationship(
-    back_populates="museum", cascade="all, delete-orphan"
-    )
-
 class Exhibition(db.Model):
     __tablename__ = "exhibition"
 
@@ -276,7 +272,32 @@ class PassPrice(AudienceConditionsMixin, db.Model):
 
     museum_pass: Mapped["MuseumPass"] = relationship(back_populates="prices")
 
-class Ticket(AudienceConditionsMixin, db.Model):
+class Weekday(enum.IntEnum):
+    MONDAY = 0
+    TUESDAY = 1
+    WEDNESDAY = 2
+    THURSDAY = 3
+    FRIDAY = 4
+    SATURDAY = 5
+    SUNDAY = 6
+
+class ScheduleConditionsMixin:
+    # Free type of rules
+    ## Free on day of the week
+    weekday: Mapped[Optional[int]] = mapped_column(Integer)
+    start_time: Mapped[Optional[time]] = mapped_column(Time)
+    end_time: Mapped[Optional[time]] = mapped_column(Time)
+    ## Free on the Nth weekday of the month (1-5), or the last one (-1)
+    week_of_month: Mapped[Optional[int]]
+
+    ## Free on annual date
+    month: Mapped[Optional[int]]
+    day: Mapped[Optional[int]]
+
+    ## Free on holidays
+    holidays: Mapped[bool] = mapped_column(default=False)
+
+class Ticket(AudienceConditionsMixin, ScheduleConditionsMixin, db.Model):
     __tablename__ = "tickets"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -289,12 +310,32 @@ class Ticket(AudienceConditionsMixin, db.Model):
 
     # Constraints
     __table_args__ = (
+        UniqueConstraint("museum_id", "label", name="uq_ticket_museum_label"),
         CheckConstraint("price >= 0", name="ck_ticket_price_nonneg"),
         CheckConstraint(
             "min_age IS NULL OR max_age IS NULL OR min_age <= max_age",
             name="ck_ticket_age_range",
         ),
-        CheckConstraint("min_age IS NULL OR min_age >= 0", name="ck_ticket_min_age")
+        CheckConstraint("min_age IS NULL OR min_age >= 0", name="ck_ticket_min_age"),
+        CheckConstraint(
+            "(weekday IS NULL AND month IS NULL AND day IS NULL AND NOT holidays) "
+            "OR (weekday IS NOT NULL AND month IS NULL AND day IS NULL AND NOT holidays) "
+            "OR (weekday IS NULL AND month IS NOT NULL AND day IS NOT NULL AND NOT holidays) "
+            "OR (weekday IS NULL AND month IS NULL AND day IS NULL AND holidays)",
+            name="ck_ticket_schedule_kind",
+        ),
+        CheckConstraint(
+            "week_of_month IS NULL OR (weekday IS NOT NULL "
+            "AND (week_of_month = -1 OR week_of_month BETWEEN 1 AND 5))",
+            name="ck_ticket_week_of_month",
+        ),
+        CheckConstraint("weekday IS NULL OR weekday BETWEEN 0 AND 6", name="ck_free_rule_weekday"),
+        CheckConstraint("month IS NULL OR month BETWEEN 1 AND 12", name="ck_free_rule_month"),
+        CheckConstraint("day IS NULL OR day BETWEEN 1 AND 31", name="ck_free_rule_day"),
+        CheckConstraint(
+            "start_time IS NULL OR end_time IS NULL OR start_time < end_time",
+            name="ck_ticket_time_range",
+        ),
     )
 
     # Relationships
@@ -311,57 +352,6 @@ ticket_exhibition = Table(
     Column("ticket_id", ForeignKey("tickets.id"), primary_key=True),
     Column("exhibition_id", ForeignKey("exhibition.id"), primary_key=True),
 )
-
-class Weekday(enum.IntEnum):
-    MONDAY = 0
-    TUESDAY = 1
-    WEDNESDAY = 2
-    THURSDAY = 3
-    FRIDAY = 4
-    SATURDAY = 5
-    SUNDAY = 6
-
-class FreeAccessRule(AudienceConditionsMixin, db.Model):
-    __tablename__ = "free_access_rules"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    museum_id: Mapped[int] = mapped_column(ForeignKey("museum.id", ondelete="CASCADE"))
-
-    # Free type of rules
-    ## Free on day of the week
-    weekday: Mapped[Optional[int]] = mapped_column(Integer)
-    start_time: Mapped[Optional[time]] = mapped_column(Time)
-    end_time: Mapped[Optional[time]] = mapped_column(Time)
-
-    ## Free on annual date
-    month: Mapped[Optional[int]]
-    day: Mapped[Optional[int]]
-
-    ## Free on holidays
-    holidays: Mapped[bool] = mapped_column(default=False)
-
-    # What it covers
-    includes_temporary_exhibitions: Mapped[bool] = mapped_column(default=False)
-    notes: Mapped[Optional[str]] = mapped_column(Text)
-
-    # Constraints
-    __table_args__ = (
-        CheckConstraint(
-            "(weekday IS NOT NULL AND month IS NULL AND day IS NULL AND NOT holidays) "
-            "OR (weekday IS NULL AND month IS NOT NULL AND day IS NOT NULL AND NOT holidays) "
-            "OR (weekday IS NULL AND month IS NULL AND day IS NULL AND holidays)",
-            name="ck_free_rule_kind",
-        ),
-        CheckConstraint("weekday IS NULL OR weekday BETWEEN 0 AND 6", name="ck_free_rule_weekday"),
-        CheckConstraint("month IS NULL OR month BETWEEN 1 AND 12", name="ck_free_rule_month"),
-        CheckConstraint("day IS NULL OR day BETWEEN 1 AND 31", name="ck_free_rule_day"),
-        CheckConstraint(
-            "start_time IS NULL OR end_time IS NULL OR start_time < end_time",
-            name="ck_free_rule_time_range",
-        ),
-    )
-
-    museum: Mapped["Museum"] = relationship(back_populates="free_access_rules")
 
 @login_manager.user_loader
 def load_user(user_id):

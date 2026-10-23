@@ -7,12 +7,12 @@ Run with:
 import sys
 import csv
 from pathlib import Path
-from datetime import date, time
+from datetime import date, time, datetime
 from decimal import Decimal
 
 from werkzeug.security import generate_password_hash
 
-from app.models import Museum, User, Exhibition, MuseumVisit, MuseumReview, MuseumWishlist, ExhibitionVisit, ExhibitionReview, ExhibitionWishlist, MuseumPass, PassPrice, Ticket, DurationUnit, Weekday, FreeAccessRule
+from app.models import Museum, User, Exhibition, MuseumVisit, MuseumReview, MuseumWishlist, ExhibitionVisit, ExhibitionReview, ExhibitionWishlist, MuseumPass, PassPrice, Ticket, DurationUnit, Weekday
 from app import create_app, db
 
 # Database Logic
@@ -45,7 +45,7 @@ DATA_DIR = Path(__file__).parent / "seed_data"
 
 def read_rows(filename):
     with open(DATA_DIR / filename, newline="", encoding="utf-8-sig") as f:
-        for row in csv.DictReader(f):
+        for row in csv.DictReader(f, delimiter=";"):
             # Empty cell -> None, so nullable columns stay NULL
             yield {k: (v.strip() or None) for k, v in row.items()}
 
@@ -53,13 +53,16 @@ def parse_bool(v):
     return v is not None and v.lower() in {"1", "true", "yes"}
 
 def parse_date(v):
-    return date.fromisoformat(v) if v else None
+    return datetime.strptime(v, "%d/%m/%Y").date() if v else None
 
 def parse_int(v):
     return int(v) if v else None
 
 def parse_time(v):
     return time.fromisoformat(v) if v else None
+
+def parse_decimal(v):
+    return Decimal(v.replace(",", "."))
 
 # Seed functions
 def seed_users():
@@ -195,7 +198,7 @@ def seed_pass_prices(museum_passes):
 
         row["duration_unit"] = DurationUnit[row["duration_unit"]]
         row["duration_value"] = int(row["duration_value"])
-        row["price"] = Decimal(row["price"])
+        row["price"] = parse_decimal(row["price"])
         row["min_age"] = parse_int(row["min_age"])
         row["max_age"] = parse_int(row["max_age"])
         row["is_student"] = parse_bool(row["is_student"])
@@ -222,10 +225,18 @@ def seed_tickets(museums, museum_passes):
         pass_name = row.pop("pass_name", None)
         row["pass_id"] = museum_passes[pass_name].id if pass_name else None
 
-        row["price"] = Decimal(row["price"])
+        row["price"] = parse_decimal(row["price"])
         row["min_age"] = parse_int(row["min_age"])
         row["max_age"] = parse_int(row["max_age"])
         row["is_student"] = parse_bool(row["is_student"])
+
+        row["weekday"] = Weekday[row["weekday"]] if row["weekday"] else None
+        row["week_of_month"] = parse_int(row["week_of_month"])
+        row["start_time"] = parse_time(row["start_time"])
+        row["end_time"] = parse_time(row["end_time"])
+        row["month"] = parse_int(row["month"])
+        row["day"] = parse_int(row["day"])
+        row["holidays"] = parse_bool(row["holidays"])
 
         result[(museum.id, label)] = get_or_create(Ticket, museum_id=museum.id, label=label, defaults=row)
 
@@ -239,28 +250,6 @@ def seed_ticket_exhibition(tickets, exhibitions, museums):
 
         if exhibition not in ticket.exhibitions:
             ticket.exhibitions.append(exhibition)
-
-def seed_free_access_rules(museums):
-    for row in read_rows("free_access_rules.csv"):
-        museum = museums[(row["museum_name"], row["museum_city"])]
-
-        row.pop("museum_name")
-        row.pop("museum_city")
-
-        notes = row.pop("notes", None)
-
-        row["weekday"] = Weekday[row["weekday"]] if row["weekday"] else None
-        row["start_time"] = parse_time(row["start_time"])
-        row["end_time"] = parse_time(row["end_time"])
-        row["month"] = parse_int(row["month"])
-        row["day"] = parse_int(row["day"])
-        row["holidays"] = parse_bool(row["holidays"])
-        row["includes_temporary_exhibitions"] = parse_bool(row["includes_temporary_exhibitions"])
-        row["min_age"] = parse_int(row["min_age"])
-        row["max_age"] = parse_int(row["max_age"])
-        row["is_student"] = parse_bool(row["is_student"])
-
-        get_or_create(FreeAccessRule, museum_id=museum.id, defaults={"notes": notes}, **row)
 
 def main():
     app = create_app()
@@ -281,7 +270,6 @@ def main():
         seed_exhibition_reviews(users, exhibitions)
         seed_pass_prices(museum_passes)
         seed_ticket_exhibition(tickets, exhibitions, museums)
-        seed_free_access_rules(museums)
 
         db.session.commit()
         print("Seeding done.")
