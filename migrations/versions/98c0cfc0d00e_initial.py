@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: 6cbfa0ceeb60
+Revision ID: 98c0cfc0d00e
 Revises: 
-Create Date: 2026-10-18 12:08:15.417990
+Create Date: 2026-10-22 15:31:26.949998
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '6cbfa0ceeb60'
+revision = '98c0cfc0d00e'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -70,6 +70,30 @@ def upgrade():
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('museum_id', 'name', name='uq_exhibition_museum_name')
     )
+    op.create_table('free_access_rules',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('museum_id', sa.Integer(), nullable=False),
+    sa.Column('weekday', sa.Integer(), nullable=True),
+    sa.Column('start_time', sa.Time(), nullable=True),
+    sa.Column('end_time', sa.Time(), nullable=True),
+    sa.Column('month', sa.Integer(), nullable=True),
+    sa.Column('day', sa.Integer(), nullable=True),
+    sa.Column('holidays', sa.Boolean(), nullable=False),
+    sa.Column('includes_temporary_exhibitions', sa.Boolean(), nullable=False),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('resident_country', sa.String(length=2), nullable=True),
+    sa.Column('resident_municipality', sa.String(length=100), nullable=True),
+    sa.Column('min_age', sa.Integer(), nullable=True),
+    sa.Column('max_age', sa.Integer(), nullable=True),
+    sa.Column('is_student', sa.Boolean(), nullable=False),
+    sa.CheckConstraint('(weekday IS NOT NULL AND month IS NULL AND day IS NULL AND NOT holidays) OR (weekday IS NULL AND month IS NOT NULL AND day IS NOT NULL AND NOT holidays) OR (weekday IS NULL AND month IS NULL AND day IS NULL AND holidays)', name='ck_free_rule_kind'),
+    sa.CheckConstraint('day IS NULL OR day BETWEEN 1 AND 31', name='ck_free_rule_day'),
+    sa.CheckConstraint('month IS NULL OR month BETWEEN 1 AND 12', name='ck_free_rule_month'),
+    sa.CheckConstraint('start_time IS NULL OR end_time IS NULL OR start_time < end_time', name='ck_free_rule_time_range'),
+    sa.CheckConstraint('weekday IS NULL OR weekday BETWEEN 0 AND 6', name='ck_free_rule_weekday'),
+    sa.ForeignKeyConstraint(['museum_id'], ['museum.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('museum_reviews',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -116,6 +140,7 @@ def upgrade():
     sa.Column('resident_municipality', sa.String(length=100), nullable=True),
     sa.Column('min_age', sa.Integer(), nullable=True),
     sa.Column('max_age', sa.Integer(), nullable=True),
+    sa.Column('is_student', sa.Boolean(), nullable=False),
     sa.CheckConstraint("duration_unit IN ('hours', 'days', 'months', 'years')", name='duration_unit'),
     sa.CheckConstraint("duration_unit IN ('hours', 'days', 'months', 'years')", name='duration_unit'),
     sa.CheckConstraint('duration_value > 0', name='ck_pass_price_duration_positive'),
@@ -138,6 +163,7 @@ def upgrade():
     sa.Column('resident_municipality', sa.String(length=100), nullable=True),
     sa.Column('min_age', sa.Integer(), nullable=True),
     sa.Column('max_age', sa.Integer(), nullable=True),
+    sa.Column('is_student', sa.Boolean(), nullable=False),
     sa.CheckConstraint('min_age IS NULL OR max_age IS NULL OR min_age <= max_age', name='ck_ticket_age_range'),
     sa.CheckConstraint('min_age IS NULL OR min_age >= 0', name='ck_ticket_min_age'),
     sa.CheckConstraint('price >= 0', name='ck_ticket_price_nonneg'),
@@ -199,6 +225,7 @@ def downgrade():
     op.drop_table('museum_wishlist')
     op.drop_table('museum_visits')
     op.drop_table('museum_reviews')
+    op.drop_table('free_access_rules')
     op.drop_table('exhibition')
     op.drop_table('user_account')
     op.drop_table('passes')

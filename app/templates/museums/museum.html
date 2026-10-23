@@ -1,11 +1,110 @@
 {% extends "base.html" %}
 
+{% block title %}{{ museum.name }} · Museum Tracker{% endblock %}
+
 {% block content %}
-  <a href="{{ url_for('museums.museums') }}">Return to the list of museums</a>
-  <img src="{{museum.image_url}}" alt="{{museum.name}}" width="100px" height="100px"></img>
-  <h1>{{museum.name}}</h1>
-  <a>Country: {{museum.country}}</a>
-  <a>City: {{museum.city}}</a>
-  <a href="{{museum.website}}">{{museum.website}}</a>
-  <p>{{museum.description}}</p>
+  <p><a href="{{ url_for('museums.museums') }}">← All museums</a></p>
+
+  <article class="museum">
+    <header class="museum-header">
+      {% if museum.image_url %}
+        <img class="museum-cover" src="{{ museum.image_url }}" alt="{{ museum.name }}">
+      {% endif %}
+      <div>
+        <h1>{{ museum.name }}</h1>
+        <p class="museum-location">{{ museum.city }}, {{ museum.country }}</p>
+      </div>
+    </header>
+
+    <section>
+      <h2>About</h2>
+      {% if museum.description %}
+        <p>{{ museum.description }}</p>
+      {% else %}
+        <p class="muted">No description yet.</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>Visit</h2>
+      <dl class="museum-details">
+        <dt>Address</dt>
+        <dd>{{ museum.address }}</dd>
+        {% if museum.website %}
+          <dt>Website</dt>
+          <dd><a href="{{ museum.website }}" target="_blank" rel="noopener noreferrer">{{ museum.website }}</a></dd>
+        {% endif %}
+      </dl>
+    </section>
+
+    {% set permanent = museum.exhibitions | selectattr("is_permanent") | list %}
+    {% set temporary = museum.exhibitions | rejectattr("is_permanent") | list %}
+
+    <section>
+      <h2>Exhibitions</h2>
+
+      {% if permanent %}
+        <h3>Permanent</h3>
+        <ul class="exhibition-list">
+          {% for e in permanent %}
+            <li>
+              <strong>{{ e.name }}</strong>
+              {% if e.short_description %}<br><span class="muted">{{ e.short_description }}</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% if temporary %}
+        <h3>Temporary</h3>
+        <ul class="exhibition-list">
+          {% for e in temporary | sort(attribute="start_date") %}
+            <li>
+              <strong>
+                {% if e.website %}
+                  <a href="{{ e.website }}" target="_blank" rel="noopener noreferrer">{{ e.name }}</a>
+                {% else %}
+                  {{ e.name }}
+                {% endif %}
+              </strong>
+              {% if e.start_date or e.end_date %}
+                <span class="muted">
+                  ({{ e.start_date.strftime("%d/%m/%Y") if e.start_date else "…" }}
+                  – {{ e.end_date.strftime("%d/%m/%Y") if e.end_date else "…" }})
+                </span>
+              {% endif %}
+              {% if e.short_description %}<br><span class="muted">{{ e.short_description }}</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% if not museum.exhibitions %}
+        <p class="muted">No exhibitions listed yet.</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>Tickets</h2>
+      {% if museum.tickets %}
+        <table class="ticket-table">
+          <thead>
+            <tr><th>Ticket</th><th>Price</th></tr>
+          </thead>
+          <tbody>
+            {% for t in museum.tickets | sort(attribute="price", reverse=true) %}
+              <tr>
+                <td>{{ t.label }}</td>
+                <td>
+                  {% if t.price == 0 %}Free{% else %}{{ "%.2f"|format(t.price) }} {{ t.currency }}{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="muted">No ticket information yet.</p>
+      {% endif %}
+    </section>
+  </article>
 {% endblock %}
