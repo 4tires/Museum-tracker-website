@@ -32,4 +32,9 @@ def period_sort_key(period: tuple):
     so None is turned into a flag plus zeros.
     """
     month_from, day_from, month_to, day_to = period
-    return (month_from is not None, month_from or 0, day_from or 0, month_to or 0, day_to or 0)
+    return (
+        month_from is not None, # False when the period is all year / True when the period is seasonal 
+        month_from or 0,
+        day_from or 0,
+        month_to or 0,
+        day_to or 0)

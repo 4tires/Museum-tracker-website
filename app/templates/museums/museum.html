@@ -145,7 +145,7 @@
                 <td>
                   {% if sp.label %}<strong>{{ sp.label }}</strong><br>{% endif %}
                   {{ sp.when }}
-                  {% if sp.period %}<br><span class="muted">{{ sp.period }}</span>{% endif %}
+                  {% if sp.period %}<span class="muted">({{ sp.period }})</span>{% endif %}
                 </td>
                 <td>{{ sp.hours }}</td>
                 <td class="muted">{{ sp.last_entry }}</td>
@@ -175,10 +175,10 @@
         var tabs = document.querySelectorAll(".period-tab");
         tabs.forEach(function (tab) {
           tab.addEventListener("click", function () {
-            tabs.forEach(function (t) {
-              var selected = t === tab;
-              t.setAttribute("aria-selected", selected ? "true" : "false");
-              document.getElementById(t.dataset.target).hidden = !selected;
+            tabs.forEach(function (currentTab) {
+              var selected = currentTab === tab;
+              currentTab.setAttribute("aria-selected", selected ? "true" : "false");
+              document.getElementById(currentTab.dataset.target).hidden = !selected;
             });
           });
         });
