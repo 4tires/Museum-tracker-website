@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: dd277935776b
+Revision ID: 7f2db604ef02
 Revises: 
-Create Date: 2026-10-24 10:50:01.128331
+Create Date: 2026-10-24 17:56:22.235179
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'dd277935776b'
+revision = '7f2db604ef02'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -111,8 +111,6 @@ def upgrade():
     sa.Column('is_special', sa.Boolean(), nullable=False),
     sa.Column('label', sa.String(length=100), nullable=True),
     sa.Column('notes', sa.Text(), nullable=True),
-    sa.Column('valid_from', sa.Date(), nullable=True),
-    sa.Column('valid_to', sa.Date(), nullable=True),
     sa.Column('weekday', sa.Integer(), nullable=True),
     sa.Column('start_time', sa.Time(), nullable=True),
     sa.Column('end_time', sa.Time(), nullable=True),
@@ -121,7 +119,9 @@ def upgrade():
     sa.Column('day', sa.Integer(), nullable=True),
     sa.Column('holidays', sa.Boolean(), nullable=False),
     sa.Column('month_from', sa.Integer(), nullable=True),
+    sa.Column('day_from', sa.Integer(), nullable=True),
     sa.Column('month_to', sa.Integer(), nullable=True),
+    sa.Column('day_to', sa.Integer(), nullable=True),
     sa.CheckConstraint('(is_closed AND start_time IS NULL AND end_time IS NULL AND last_entry IS NULL) OR (NOT is_closed AND start_time IS NOT NULL AND end_time IS NOT NULL)', name='ck_hours_closed_or_times'),
     sa.CheckConstraint('(month IS NULL) = (day IS NULL)', name='ck_hours_month_day_pair'),
     sa.CheckConstraint('(month_from IS NULL AND month_to IS NULL) OR (month_from BETWEEN 1 AND 12 AND month_to BETWEEN 1 AND 12 AND month_from <= month_to)', name='ck_hours_month_range'),
@@ -129,7 +129,6 @@ def upgrade():
     sa.CheckConstraint('day IS NULL OR day BETWEEN 1 AND 31', name='ck_hours_day'),
     sa.CheckConstraint('month IS NULL OR month BETWEEN 1 AND 12', name='ck_hours_month'),
     sa.CheckConstraint('start_time < end_time', name='ck_hours_time_range'),
-    sa.CheckConstraint('valid_from IS NULL OR valid_to IS NULL OR valid_from <= valid_to', name='ck_hours_valid_range'),
     sa.CheckConstraint('week_of_month IS NULL OR (weekday IS NOT NULL AND (week_of_month = -1 OR week_of_month BETWEEN 1 AND 5))', name='ck_hours_week_of_month'),
     sa.CheckConstraint('weekday IS NULL OR weekday BETWEEN 0 AND 6', name='ck_hours_weekday'),
     sa.ForeignKeyConstraint(['museum_id'], ['museum.id'], ondelete='CASCADE'),
@@ -180,7 +179,9 @@ def upgrade():
     sa.Column('day', sa.Integer(), nullable=True),
     sa.Column('holidays', sa.Boolean(), nullable=False),
     sa.Column('month_from', sa.Integer(), nullable=True),
+    sa.Column('day_from', sa.Integer(), nullable=True),
     sa.Column('month_to', sa.Integer(), nullable=True),
+    sa.Column('day_to', sa.Integer(), nullable=True),
     sa.CheckConstraint('(weekday IS NULL AND month IS NULL AND day IS NULL AND NOT holidays) OR (weekday IS NOT NULL AND month IS NULL AND day IS NULL AND NOT holidays) OR (weekday IS NULL AND month IS NOT NULL AND day IS NOT NULL AND NOT holidays) OR (weekday IS NULL AND month IS NULL AND day IS NULL AND holidays)', name='ck_ticket_schedule_kind'),
     sa.CheckConstraint('day IS NULL OR day BETWEEN 1 AND 31', name='ck_free_rule_day'),
     sa.CheckConstraint('min_age IS NULL OR max_age IS NULL OR min_age <= max_age', name='ck_ticket_age_range'),

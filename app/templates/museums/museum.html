@@ -81,6 +81,113 @@
       {% endif %}
     </section>
 
+    <section class="opening-hours">
+      <h2>Opening hours</h2>
+     
+      {% if hours.is_empty %}
+        <p class="muted">No opening hours listed yet.</p>
+      {% endif %}
+     
+      {% if hours.has_regular %}
+        {% set multi = hours.regular | length > 1 %}
+     
+        {% if multi %}
+          <div class="period-tabs" role="tablist" aria-label="Opening hours period">
+            {% for s in hours.regular %}
+              <button type="button" role="tab" class="period-tab"
+                      aria-selected="{{ 'true' if loop.first else 'false' }}"
+                      aria-controls="period-{{ loop.index0 }}"
+                      data-target="period-{{ loop.index0 }}">{{ s.title }}</button>
+            {% endfor %}
+          </div>
+        {% elif not hours.regular[0].is_year_round %}
+          <h3>{{ hours.regular[0].title }}</h3>
+        {% endif %}
+     
+        {% for s in hours.regular %}
+          <div class="period-panel" id="period-{{ loop.index0 }}" role="tabpanel"{% if multi and not loop.first %} hidden{% endif %}>
+            <table class="hours-table">
+              <thead>
+                <tr><th>Day</th><th>Hours</th><th>Last entry</th></tr>
+              </thead>
+              <tbody>
+                {% for d in s.days %}
+                  {% if d.slots %}
+                    {% for slot in d.slots %}
+                      <tr>
+                        {% if loop.first %}<th scope="row" rowspan="{{ d.slots | length }}">{{ d.day }}</th>{% endif %}
+                        <td>{{ slot.hours }}</td>
+                        <td class="muted">{{ slot.last_entry }}</td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr>
+                      <th scope="row">{{ d.day }}</th>
+                      <td colspan="2" class="muted">Not listed</td>
+                    </tr>
+                  {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endfor %}
+      {% endif %}
+     
+      {% if hours.special %}
+        <h3>Special hours</h3>
+        <table class="hours-table">
+          <thead>
+            <tr><th>When</th><th>Hours</th><th>Last entry</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            {% for sp in hours.special %}
+              <tr>
+                <td>
+                  {% if sp.label %}<strong>{{ sp.label }}</strong><br>{% endif %}
+                  {{ sp.when }}
+                  {% if sp.period %}<br><span class="muted">{{ sp.period }}</span>{% endif %}
+                </td>
+                <td>{{ sp.hours }}</td>
+                <td class="muted">{{ sp.last_entry }}</td>
+                <td class="muted">{{ sp.notes }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+     
+      {% if hours.closures %}
+        <h3>Closures</h3>
+        <ul class="hours-closures">
+          {% for c in hours.closures %}
+            <li>
+              <strong>{{ c.when }}</strong>{% if c.label %} · {{ c.label }}{% endif %}
+              {% if c.notes %}<br><span class="muted">{{ c.notes }}</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+     
+    <script>
+      // Period buttons: show the selected period's table, hide the others.
+      (function () {
+        var tabs = document.querySelectorAll(".period-tab");
+        tabs.forEach(function (tab) {
+          tab.addEventListener("click", function () {
+            tabs.forEach(function (t) {
+              var selected = t === tab;
+              t.setAttribute("aria-selected", selected ? "true" : "false");
+              document.getElementById(t.dataset.target).hidden = !selected;
+            });
+          });
+        });
+      })();
+    </script>
+
+
+
+
     <section>
       <h2>Tickets</h2>
       {% if museum.tickets %}

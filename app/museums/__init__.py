@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template
 from app.extensions import db
 from app.models import Museum
+from .hours import build_opening_hours
 
 bp = Blueprint("museums", __name__)
 
@@ -22,4 +23,5 @@ def museums():
 @bp.route("/museums/<int:museum_id>")
 def museum(museum_id):
     museum = db.get_or_404(Museum, museum_id)
-    return render_template("museums/museum.html", museum=museum)
+    hours = build_opening_hours(museum.opening_hours)
+    return render_template("museums/museum.html", museum=museum, hours=hours)

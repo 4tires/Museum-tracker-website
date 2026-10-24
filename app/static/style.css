@@ -37,3 +37,12 @@ body {
   .museum-header { flex-direction: column; align-items: flex-start; }
   .museum-cover { width: 100%; height: auto; }
 }
+
+.hours-table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
+.hours-table th, .hours-table td { text-align: left; padding: 0.4rem 1rem 0.4rem 0; border-bottom: 1px solid #ddd; vertical-align: top; }
+.hours-closures { padding-left: 1.25rem; }
+
+.period-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+.period-tab { font: inherit; padding: 0.35rem 0.75rem; border: 1px solid #ccc; border-radius: 0.4rem; background: #f6f6f6; cursor: pointer; }
+.period-tab[aria-selected="true"] { background: #222; color: #fff; border-color: #222; }
+.period-tab:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }

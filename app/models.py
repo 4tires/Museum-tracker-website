@@ -303,7 +303,9 @@ class ScheduleConditionsMixin:
 
     # Recurring month range where the rule is valid
     month_from: Mapped[Optional[int]]
+    day_from: Mapped[Optional[int]]
     month_to: Mapped[Optional[int]]
+    day_to: Mapped[Optional[int]]
 
 class Ticket(AudienceConditionsMixin, ScheduleConditionsMixin, db.Model):
     __tablename__ = "tickets"
@@ -374,10 +376,6 @@ class OpeningHours(ScheduleConditionsMixin, db.Model):
     label: Mapped[Optional[str]] = mapped_column(String(100)) # "Thursday Late"
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
-    # One-off validity window (e.g. a summer schedule for 2027 only)
-    valid_from: Mapped[Optional[date]]
-    valid_to: Mapped[Optional[date]]
-
     __table_args__ = (
         CheckConstraint(
             "(is_closed AND start_time IS NULL AND end_time IS NULL AND last_entry IS NULL) "
@@ -403,10 +401,6 @@ class OpeningHours(ScheduleConditionsMixin, db.Model):
         CheckConstraint(
             "NOT holidays OR (weekday IS NULL AND month IS NULL AND day IS NULL)",
             name="ck_hours_holidays_alone",
-        ),
-        CheckConstraint(
-            "valid_from IS NULL OR valid_to IS NULL OR valid_from <= valid_to",
-            name="ck_hours_valid_range",
         ),
     )
 

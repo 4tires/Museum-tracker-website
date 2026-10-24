@@ -240,6 +240,11 @@ def seed_tickets(museums, museum_passes):
         row["day"] = parse_int(row["day"])
         row["holidays"] = parse_bool(row["holidays"])
 
+        row["month_from"] = parse_int(row["month_from"])
+        row["day_from"] = parse_int(row["day_from"])
+        row["month_to"] = parse_int(row["month_to"])
+        row["day_to"] = parse_int(row["day_to"])
+
         result[(museum.id, label)] = get_or_create(Ticket, museum_id=museum.id, label=label, defaults=row)
 
     return result
@@ -261,7 +266,6 @@ def seed_opening_hours(museums):
         row.pop("museum_name")
         row.pop("museum_city")
 
-        
         row["is_special"] = parse_bool(row["is_special"])
         row["is_closed"] = parse_bool(row["is_closed"])
         row["weekday"] = Weekday[row["weekday"]] if row["weekday"] else None
@@ -273,9 +277,9 @@ def seed_opening_hours(museums):
         row["day"] = parse_int(row["day"])
         row["holidays"] = parse_bool(row["holidays"])
         row["month_from"] = parse_int(row["month_from"])
+        row["day_from"] = parse_int(row["day_from"])
         row["month_to"] = parse_int(row["month_to"])
-        row["valid_from"] = parse_date(row["valid_from"])
-        row["valid_to"] = parse_date(row["valid_to"])
+        row["day_to"] = parse_int(row["day_to"])
 
         get_or_create(OpeningHours, museum_id=museum.id, **row)
 
