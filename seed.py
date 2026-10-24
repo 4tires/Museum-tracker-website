@@ -12,7 +12,9 @@ from decimal import Decimal
 
 from werkzeug.security import generate_password_hash
 
-from app.models import Museum, User, Exhibition, MuseumVisit, MuseumReview, MuseumWishlist, ExhibitionVisit, ExhibitionReview, ExhibitionWishlist, MuseumPass, PassPrice, Ticket, DurationUnit, Weekday
+from app.models import (Museum, User, Exhibition, MuseumVisit, MuseumReview, MuseumWishlist, ExhibitionVisit,
+                        ExhibitionReview, ExhibitionWishlist, MuseumPass, PassPrice, Ticket, DurationUnit, Weekday,
+                        OpeningHours,)
 from app import create_app, db
 
 # Database Logic
@@ -275,7 +277,7 @@ def seed_opening_hours(museums):
         row["valid_from"] = parse_date(row["valid_from"])
         row["valid_to"] = parse_date(row["valid_to"])
 
-        result[(museum.id, label)] = get_or_create(Ticket, museum_id=museum.id, defaults=row)
+        get_or_create(OpeningHours, museum_id=museum.id, **row)
 
     return result
 
