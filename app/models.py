@@ -59,6 +59,10 @@ class Museum(db.Model):
         back_populates="museum", cascade="all, delete-orphan"
     )
 
+    opening_hours: Mapped[list["OpeningHours"]] = relationship(
+        back_populates="museum", cascade="all, delete-orphan"
+    )
+
 class Exhibition(db.Model):
     __tablename__ = "exhibition"
 
@@ -297,6 +301,10 @@ class ScheduleConditionsMixin:
     ## Free on holidays
     holidays: Mapped[bool] = mapped_column(default=False)
 
+    # Recurring month range where the rule is valid
+    month_from: Mapped[Optional[int]]
+    month_to: Mapped[Optional[int]]
+
 class Ticket(AudienceConditionsMixin, ScheduleConditionsMixin, db.Model):
     __tablename__ = "tickets"
 
@@ -352,6 +360,58 @@ ticket_exhibition = Table(
     Column("ticket_id", ForeignKey("tickets.id"), primary_key=True),
     Column("exhibition_id", ForeignKey("exhibition.id"), primary_key=True),
 )
+
+class OpeningHours(ScheduleConditionsMixin, db.Model):
+    __tablename__ = "opening_hours"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    museum_id: Mapped[int] = mapped_column(ForeignKey("museum.id", ondelete="CASCADE"))
+    # start_time / end_time (from the mixin) are the opening and closing times
+    last_entry: Mapped[Optional[time]] = mapped_column(Time)
+
+    is_closed: Mapped[bool] = mapped_column(default=False)
+    is_special: Mapped[bool] = mapped_column(default=False)   # overrides regular hours
+    label: Mapped[Optional[str]] = mapped_column(String(100)) # "Thursday Late"
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    # One-off validity window (e.g. a summer schedule for 2027 only)
+    valid_from: Mapped[Optional[date]]
+    valid_to: Mapped[Optional[date]]
+
+    __table_args__ = (
+        CheckConstraint(
+            "(is_closed AND start_time IS NULL AND end_time IS NULL AND last_entry IS NULL) "
+            "OR (NOT is_closed AND start_time IS NOT NULL AND end_time IS NOT NULL)",
+            name="ck_hours_closed_or_times",
+        ),
+        CheckConstraint("start_time < end_time", name="ck_hours_time_range"),
+        CheckConstraint("weekday IS NULL OR weekday BETWEEN 0 AND 6", name="ck_hours_weekday"),
+        CheckConstraint(
+            "week_of_month IS NULL OR (weekday IS NOT NULL "
+            "AND (week_of_month = -1 OR week_of_month BETWEEN 1 AND 5))",
+            name="ck_hours_week_of_month",
+        ),
+        CheckConstraint("month IS NULL OR month BETWEEN 1 AND 12", name="ck_hours_month"),
+        CheckConstraint("day IS NULL OR day BETWEEN 1 AND 31", name="ck_hours_day"),
+        CheckConstraint("(month IS NULL) = (day IS NULL)", name="ck_hours_month_day_pair"),
+        CheckConstraint(
+            "(month_from IS NULL AND month_to IS NULL) "
+            "OR (month_from BETWEEN 1 AND 12 AND month_to BETWEEN 1 AND 12 "
+            "AND month_from <= month_to)",
+            name="ck_hours_month_range",
+        ),
+        CheckConstraint(
+            "NOT holidays OR (weekday IS NULL AND month IS NULL AND day IS NULL)",
+            name="ck_hours_holidays_alone",
+        ),
+        CheckConstraint(
+            "valid_from IS NULL OR valid_to IS NULL OR valid_from <= valid_to",
+            name="ck_hours_valid_range",
+        ),
+    )
+
+    # Relationships
+    museum: Mapped["Museum"] = relationship(back_populates="opening_hours")
 
 @login_manager.user_loader
 def load_user(user_id):

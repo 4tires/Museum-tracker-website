@@ -251,6 +251,34 @@ def seed_ticket_exhibition(tickets, exhibitions, museums):
         if exhibition not in ticket.exhibitions:
             ticket.exhibitions.append(exhibition)
 
+def seed_opening_hours(museums):
+    result = {}
+    for row in read_rows("opening_hours.csv"):
+        museum = museums[(row["museum_name"], row["museum_city"])]
+
+        row.pop("museum_name")
+        row.pop("museum_city")
+
+        
+        row["is_special"] = parse_bool(row["is_special"])
+        row["is_closed"] = parse_bool(row["is_closed"])
+        row["weekday"] = Weekday[row["weekday"]] if row["weekday"] else None
+        row["start_time"] = parse_time(row["start_time"])
+        row["end_time"] = parse_time(row["end_time"])
+        row["last_entry"] = parse_time(row["last_entry"])
+        row["week_of_month"] = parse_int(row["week_of_month"])
+        row["month"] = parse_int(row["month"])
+        row["day"] = parse_int(row["day"])
+        row["holidays"] = parse_bool(row["holidays"])
+        row["month_from"] = parse_int(row["month_from"])
+        row["month_to"] = parse_int(row["month_to"])
+        row["valid_from"] = parse_date(row["valid_from"])
+        row["valid_to"] = parse_date(row["valid_to"])
+
+        result[(museum.id, label)] = get_or_create(Ticket, museum_id=museum.id, defaults=row)
+
+    return result
+
 def main():
     app = create_app()
     with app.app_context():
@@ -270,6 +298,7 @@ def main():
         seed_exhibition_reviews(users, exhibitions)
         seed_pass_prices(museum_passes)
         seed_ticket_exhibition(tickets, exhibitions, museums)
+        seed_opening_hours(museums)
 
         db.session.commit()
         print("Seeding done.")
