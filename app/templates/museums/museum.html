@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ museum.name }} · Museum Tracker{% endblock %}
+{% block title %}Museum Tracker · {{ museum.name }}{% endblock %}
 
 {% block content %}
   <p><a href="{{ url_for('museums.museums') }}">← All museums</a></p>
@@ -11,8 +11,17 @@
         <img class="museum-cover" src="{{ museum.image_url }}" alt="{{ museum.name }}">
       {% endif %}
       <div>
-        <h1>{{ museum.name }}</h1>
+        <h1>
+          {% if museum.website %}
+          <a href="{{ museum.website }}" target="_blank" rel="noopener noreferrer">{{ museum.name }}</a>
+          {% endif %}
+        </h1>
         <p class="museum-location">{{ museum.city }}, {{ museum.country }}</p>
+      <dl class="museum-details">
+        <dt>Address</dt>
+        <dd>{{ museum.address }}</dd>
+        
+      </dl>
       </div>
     </header>
 
@@ -23,18 +32,6 @@
       {% else %}
         <p class="muted">No description yet.</p>
       {% endif %}
-    </section>
-
-    <section>
-      <h2>Visit</h2>
-      <dl class="museum-details">
-        <dt>Address</dt>
-        <dd>{{ museum.address }}</dd>
-        {% if museum.website %}
-          <dt>Website</dt>
-          <dd><a href="{{ museum.website }}" target="_blank" rel="noopener noreferrer">{{ museum.website }}</a></dd>
-        {% endif %}
-      </dl>
     </section>
 
     {% set permanent = museum.exhibitions | selectattr("is_permanent") | list %}
