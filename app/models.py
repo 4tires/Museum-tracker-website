@@ -63,6 +63,10 @@ class Museum(db.Model):
     opening_hours: Mapped[list["OpeningHours"]] = relationship(
         back_populates="museum", cascade="all, delete-orphan"
     )
+    
+    audioguides: Mapped[list["Audioguide"]] = relationship(
+        back_populates="museum", cascade="all, delete-orphan"
+    )
 
 class Exhibition(db.Model):
     __tablename__ = "exhibition"
@@ -431,6 +435,57 @@ class OpeningHours(ScheduleConditionsMixin, db.Model):
 
     # Relationships
     museum: Mapped["Museum"] = relationship(back_populates="opening_hours")
+
+class Language(db.Model):
+    __tablename__ = "languages"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(8), unique=True)   # "pt", "en", "pt-BR"
+    name: Mapped[str] = mapped_column(String(50))                # "Portuguese"
+
+# Association table between Museum and Language
+museum_language = Table(
+    "museum_language",
+    db.metadata,
+    Column("museum_id", ForeignKey("museums.id"), primary_key=True),
+    Column("language_id", ForeignKey("languages.id"), primary_key=True),
+)
+
+class AudioguideType(enum.Enum):
+    smartphone_app = "smartphone_app"
+    web_qr = "web_qr"
+    physical_device = "physical_device"
+
+class Audioguide(db.Model):
+    __tablename__ = "audioguides"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    museum_id: Mapped[int] = mapped_column(ForeignKey("museum.id", ondelete="CASCADE"))
+    audioguide_type: Mapped[AudioguideType] = mapped_column(
+        Enum(AudioguideType, native_enum=False, create_constraint=True, name="audioguide_type")
+    )
+    requires_own_headphones: Mapped[bool] = mapped_column(default=False)
+    deposit_required: Mapped[bool] = mapped_column(default=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(8, 2))       # 0 = free
+    currency: Mapped[str] = mapped_column(String(3), default="EUR")
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint("museum_id", "audioguide_type", name="uq_audioguide_museum_type"),
+        CheckConstraint("price >= 0", name="ck_audioguide_price_nonneg"),
+    )
+
+    # Relationships
+    museum: Mapped["Museum"] = relationship(back_populates="audioguides")
+    languages: Mapped[list["Language"]] = relationship(secondary="audioguide_language")
+
+# Association table between Audioguide and Language    
+audioguide_language = Table(
+    "audioguide_language",
+    db.metadata,
+    Column("audioguide_id", ForeignKey("audioguides.id", ondelete="CASCADE"), primary_key=True),
+    Column("language_id", ForeignKey("language.id"), primary_key=True),
+)
 
 @login_manager.user_loader
 def load_user(user_id):

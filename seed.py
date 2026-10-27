@@ -14,7 +14,7 @@ from werkzeug.security import generate_password_hash
 
 from app.models import (Museum, User, Exhibition, MuseumVisit, MuseumReview, MuseumWishlist, ExhibitionVisit,
                         ExhibitionReview, ExhibitionWishlist, MuseumPass, PassPrice, Ticket, DurationUnit, Weekday,
-                        OpeningHours,)
+                        OpeningHours, Audioguide, AudioguideType, Language)
 from app import create_app, db
 
 # Database Logic
@@ -305,6 +305,30 @@ def seed_opening_hours(museums):
         get_or_create(OpeningHours, museum_id=museum.id, **row)
 
     return result
+def seed_languages():
+    result = {}
+    for row in read_rows("languages.csv"):
+        code = row.pop("code")
+        result[code] = get_or_create(Language, code=code, defaults=row)
+    return result
+
+def seed_audioguides(museums, languages):
+    # One row = one audioguide in one language. The audioguide is identified by
+    # museum + type (the unique constraint), so repeated rows reuse it.
+    for row in read_rows("audioguides.csv"):
+        museum = museums[(row.pop("museum_name"), row.pop("museum_city"))]
+        audioguide_type = AudioguideType[row.pop("type")]
+        language = languages[row.pop("language_code")]
+
+        row["price"] = parse_decimal(row["price"])
+        if not row["currency"]:
+            del row["currency"]   # let the model default ("EUR") apply
+
+        audioguide = get_or_create(
+            Audioguide, museum_id=museum.id, type=audioguide_type, defaults=row
+        )
+        if language not in audioguide.languages:
+            audioguide.languages.append(language)
 
 def main():
     app = create_app()
@@ -314,6 +338,7 @@ def main():
 
         users = seed_users()
         museums = seed_museums()
+        languages = seed_languages()
         exhibitions = seed_exhibitions(museums)
         museum_passes = seed_museum_pass()
         tickets = seed_tickets(museums, museum_passes)
@@ -326,6 +351,7 @@ def main():
         seed_pass_prices(museum_passes)
         seed_ticket_exhibition(tickets, exhibitions, museums)
         seed_opening_hours(museums)
+        seed_audioguides(museums, languages)
 
         db.session.commit()
         print("Seeding done.")
