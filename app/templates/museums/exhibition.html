@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Museum Tracker · {{ exhibition.name }}{% endblock %}
+
+{% block content %}
+  <p><a href="{{ url_for('museums.museum', museum_id=museum.id) }}">← {{ museum.name }}</a></p>
+
+  <article class="exhibition">
+    <header class="museum-header">
+      {% if exhibition.image_url %}
+        <img class="museum-cover" src="{{ exhibition.image_url }}" alt="{{ exhibition.name }}">
+      {% endif %}
+      <div>
+        <h1>{{ exhibition.name }}</h1>
+        <p class="museum-location">
+          <a href="{{ url_for('museums.museum', museum_id=museum.id) }}">{{ museum.name }}</a>
+          · {{ museum.city }}, {{ museum.country }}
+        </p>
+        <dl class="museum-details">
+          <dt>Type</dt>
+          <dd>{{ "Permanent" if exhibition.is_permanent else "Temporary" }}</dd>
+
+          {% if exhibition.start_date or exhibition.end_date %}
+            <dt>Dates</dt>
+            <dd>
+              {{ exhibition.start_date.strftime("%d/%m/%Y") if exhibition.start_date else "…" }}
+              – {{ exhibition.end_date.strftime("%d/%m/%Y") if exhibition.end_date else "…" }}
+            </dd>
+          {% endif %}
+
+          {% if archived %}
+            <dt>Status</dt>
+            <dd>Ended</dd>
+          {% endif %}
+
+          {% if exhibition.website %}
+            <dt>Website</dt>
+            <dd><a href="{{ exhibition.website }}" target="_blank" rel="noopener noreferrer">Official page</a></dd>
+          {% endif %}
+        </dl>
+      </div>
+    </header>
+
+    <section>
+      <h2>About</h2>
+      {% if exhibition.long_description %}
+        <p class="long-text">{{ exhibition.long_description }}</p>
+      {% elif exhibition.short_description %}
+        <p class="long-text">{{ exhibition.short_description }}</p>
+      {% else %}
+        <p class="muted">No description yet.</p>
+      {% endif %}
+    </section>
+  </article>
+{% endblock %}

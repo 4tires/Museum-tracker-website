@@ -12,15 +12,18 @@
       {% endif %}
       <div>
         <h1>
-          {% if museum.website %}
-          <a href="{{ museum.website }}" target="_blank" rel="noopener noreferrer">{{ museum.name }}</a>
-          {% endif %}
+          {{ museum.name }}
         </h1>
         <p class="museum-location">{{ museum.city }}, {{ museum.country }}</p>
       <dl class="museum-details">
         <dt>Address</dt>
         <dd>{{ museum.address }}</dd>
-
+        {% if museum.website %}
+        <dt>Website</dt>
+        <dd>
+          <a href="{{ museum.website }}" target="_blank" rel="noopener noreferrer">{{ museum.name }}</a>
+        </dd>
+        {% endif %}
       </dl>
       </div>
     </header>
@@ -42,7 +45,9 @@
         <ul class="exhibition-list">
           {% for e in exhibitions.permanent %}
             <li>
-              <strong>{{ e.name }}</strong>
+              <strong>
+                <a href="{{ url_for('museums.exhibition', exhibition_id=e.id) }}">{{ e.name }}</a>
+              </strong>
               {% if e.short_description %}<br><span class="muted">{{ e.short_description }}</span>{% endif %}
             </li>
           {% endfor %}
@@ -55,11 +60,7 @@
           {% for e in exhibitions.temporary %}
             <li>
               <strong>
-                {% if e.website %}
-                  <a href="{{ e.website }}" target="_blank" rel="noopener noreferrer">{{ e.name }}</a>
-                {% else %}
-                  {{ e.name }}
-                {% endif %}
+                  <a href="{{ url_for('museums.exhibition', exhibition_id=e.id) }}">{{ e.name }}</a>
               </strong>
               {% if e.start_date or e.end_date %}
                 <span class="muted">

@@ -12,11 +12,7 @@
       {% for e in exhibitions.archived %}
         <li>
           <strong>
-            {% if e.website %}
-              <a href="{{ e.website }}" target="_blank" rel="noopener noreferrer">{{ e.name }}</a>
-            {% else %}
-              {{ e.name }}
-            {% endif %}
+            <a href="{{ url_for('museums.exhibition', exhibition_id=e.id) }}">{{ e.name }}</a>
           </strong>
           <span class="muted">
             ({{ e.start_date.strftime("%d/%m/%Y") if e.start_date else "…" }}

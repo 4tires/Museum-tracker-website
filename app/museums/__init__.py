@@ -4,8 +4,8 @@ from flask import Blueprint, render_template
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
-from app.models import Museum, MuseumPass, Ticket
-from .exhibitions import split_exhibitions
+from app.models import Museum, MuseumPass, Ticket, Exhibition
+from .exhibitions import split_exhibitions, is_archived
 from .hours import build_opening_hours
 from .tickets import build_tickets
 
@@ -65,4 +65,14 @@ def museum_archive(museum_id):
     exhibitions = split_exhibitions(museum.exhibitions, date.today())
     return render_template(
         "museums/museum_archive.html", museum=museum, exhibitions=exhibitions
+    )
+
+@bp.route("/exhibitions/<int:exhibition_id>")
+def exhibition(exhibition_id):
+    exhibition = db.get_or_404(Exhibition, exhibition_id)
+    return render_template(
+        "museums/exhibition.html",
+        exhibition=exhibition,
+        museum=exhibition.museum,
+        archived=is_archived(exhibition, date.today()),
     )

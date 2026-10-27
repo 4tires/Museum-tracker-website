@@ -51,3 +51,5 @@ body {
 .period-tab { font: inherit; padding: 0.35rem 0.75rem; border: 1px solid #ccc; border-radius: 0.4rem; background: #f6f6f6; cursor: pointer; }
 .period-tab[aria-selected="true"] { background: #222; color: #fff; border-color: #222; }
 .period-tab:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+
+.long-text { white-space: pre-line; }
