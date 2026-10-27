@@ -7,22 +7,27 @@ rows by period: opening hours today, ticket prices later.
 """
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
+FULL_MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+               "August", "September", "October", "November", "December"]
 
 def period_of(row) -> tuple:
     """The row's period as a hashable key: (month_from, day_from, month_to, day_to)."""
     return (row.month_from, row.day_from, row.month_to, row.day_to)
 
 
-def period_text(month_from, day_from, month_to, day_to) -> str:
-    """'1 Apr – 31 Aug', 'Feb – Mar', 'Feb', or '' for a year-round row."""
+def period_text(month_from, day_from, month_to, day_to, full_month: bool = False) -> str:
+    """'1 Apr – 31 Aug', 'Feb – Mar', 'Feb', or '' for a year-round row.
+
+    With full_month=True the month names are spelled out ('1 April – 31 August').
+    """
+    names = FULL_MONTHS if full_month else MONTHS
     if month_from is None or month_to is None:
         return ""                                    # year-round
     if day_from is None or day_to is None:
         if month_from == month_to:
-            return MONTHS[month_from - 1]            # "Feb"
-        return f"{MONTHS[month_from - 1]} – {MONTHS[month_to - 1]}"
-    return f"{day_from} {MONTHS[month_from - 1]} – {day_to} {MONTHS[month_to - 1]}"
+            return names[month_from - 1]             # "Feb"
+        return f"{names[month_from - 1]} – {names[month_to - 1]}"
+    return f"{day_from} {names[month_from - 1]} – {day_to} {names[month_to - 1]}"
 
 
 def period_sort_key(period: tuple):

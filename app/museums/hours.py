@@ -24,11 +24,9 @@ schedule that crosses 1 Jan is stored as two periods).
 from dataclasses import dataclass, field
 from datetime import time
 from typing import Iterable, Optional
-
-from .periods import period_of, period_sort_key, period_text
+from .periods import FULL_MONTHS, MONTHS, period_of, period_sort_key, period_text
 
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 ORDINALS = {1: "First", 2: "Second", 3: "Third", 4: "Fourth", 5: "Fifth", -1: "Last"}
 
 
@@ -96,12 +94,13 @@ def _fmt_hours(h) -> tuple[str, str]:
     return hours, last_entry
 
 
-def _recurrence(h) -> Optional[str]:
+def _recurrence(h, full_month: bool = False) -> Optional[str]:
     """Which recurring pattern a row follows (without its period), or None."""
     if h.holidays:
         return "Public holidays"
     if h.month and h.day:
-        return f"{h.day} {MONTHS[h.month - 1]}"
+        names = FULL_MONTHS if full_month else MONTHS
+        return f"{h.day} {names[h.month - 1]}"
     if h.weekday is not None and h.week_of_month:
         return f"{ORDINALS[h.week_of_month]} {WEEKDAYS[h.weekday]} of the month"
     if h.weekday is not None:
@@ -114,8 +113,9 @@ def rule_text(h) -> str:
 
 
 def closure_when(h) -> str:
-    # A closure is a pattern, a period, or both.
-    parts = [p for p in (_recurrence(h), period_text(*period_of(h))) if p]
+    # Closures spell the month out in full ("25 December"); other places keep "Dec".
+    parts = [p for p in (_recurrence(h, full_month=True),
+                         period_text(*period_of(h), full_month=True)) if p]
     return " · ".join(parts) or "Closed"
 
 
