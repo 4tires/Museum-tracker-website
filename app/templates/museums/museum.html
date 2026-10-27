@@ -20,7 +20,7 @@
       <dl class="museum-details">
         <dt>Address</dt>
         <dd>{{ museum.address }}</dd>
-        
+
       </dl>
       </div>
     </header>
@@ -34,16 +34,13 @@
       {% endif %}
     </section>
 
-    {% set permanent = museum.exhibitions | selectattr("is_permanent") | list %}
-    {% set temporary = museum.exhibitions | rejectattr("is_permanent") | list %}
-
     <section>
       <h2>Exhibitions</h2>
 
-      {% if permanent %}
+      {% if exhibitions.permanent %}
         <h3>Permanent</h3>
         <ul class="exhibition-list">
-          {% for e in permanent %}
+          {% for e in exhibitions.permanent %}
             <li>
               <strong>{{ e.name }}</strong>
               {% if e.short_description %}<br><span class="muted">{{ e.short_description }}</span>{% endif %}
@@ -52,10 +49,10 @@
         </ul>
       {% endif %}
 
-      {% if temporary %}
+      {% if exhibitions.temporary %}
         <h3>Temporary</h3>
         <ul class="exhibition-list">
-          {% for e in temporary | sort(attribute="start_date") %}
+          {% for e in exhibitions.temporary %}
             <li>
               <strong>
                 {% if e.website %}
@@ -76,21 +73,25 @@
         </ul>
       {% endif %}
 
-      {% if not museum.exhibitions %}
+      {% if not exhibitions.has_current %}
         <p class="muted">No exhibitions listed yet.</p>
+      {% endif %}
+
+      {% if exhibitions.archived %}
+        <p><a href="{{ url_for('museums.museum_archive', museum_id=museum.id) }}">Past exhibitions ({{ exhibitions.archived | length }})</a></p>
       {% endif %}
     </section>
 
     <section class="opening-hours">
       <h2>Opening hours</h2>
-     
+
       {% if hours.is_empty %}
         <p class="muted">No opening hours listed yet.</p>
       {% endif %}
-     
+
       {% if hours.has_regular %}
         {% set multi = hours.regular | length > 1 %}
-     
+
         {% if multi %}
           <div class="period-tabs" role="tablist" aria-label="Opening hours period">
             {% for s in hours.regular %}
@@ -103,7 +104,7 @@
         {% elif not hours.regular[0].is_year_round %}
           <h3>{{ hours.regular[0].title }}</h3>
         {% endif %}
-     
+
         {% for s in hours.regular %}
           <div class="period-panel" id="period-{{ loop.index0 }}" role="tabpanel"{% if multi and not loop.first %} hidden{% endif %}>
             <table class="hours-table">
@@ -132,7 +133,7 @@
           </div>
         {% endfor %}
       {% endif %}
-     
+
       {% if hours.special %}
         <h3>Special hours</h3>
         <table class="hours-table">
@@ -155,7 +156,7 @@
           </tbody>
         </table>
       {% endif %}
-     
+
       {% if hours.closures %}
         <h3>Closures</h3>
         <ul class="hours-closures">
@@ -168,11 +169,103 @@
         </ul>
       {% endif %}
     </section>
-     
-    <script>
-      // Period buttons: show the selected period's table, hide the others.
-      (function () {
-        var tabs = document.querySelectorAll(".period-tab");
+
+    <section class="tickets">
+      <h2>Tickets</h2>
+
+      {% if tickets.is_empty %}
+        <p class="muted">No ticket information yet.</p>
+      {% endif %}
+
+      {% if tickets.schedules %}
+        {% set multi = tickets.schedules | length > 1 %}
+
+        {% if multi %}
+          <div class="period-tabs" role="tablist" aria-label="Ticket prices period">
+            {% for s in tickets.schedules %}
+              <button type="button" role="tab" class="period-tab"
+                      aria-selected="{{ 'true' if loop.first else 'false' }}"
+                      aria-controls="tickets-period-{{ loop.index0 }}"
+                      data-target="tickets-period-{{ loop.index0 }}">{{ s.title }}</button>
+            {% endfor %}
+          </div>
+        {% elif not tickets.schedules[0].is_year_round %}
+          <h3>{{ tickets.schedules[0].title }}</h3>
+        {% endif %}
+
+        {% for s in tickets.schedules %}
+          {% set single = s.columns | length == 1 %}
+          <div class="period-panel" id="tickets-period-{{ loop.index0 }}" role="tabpanel"{% if multi and not loop.first %} hidden{% endif %}>
+            {% if single %}
+              {% set c = s.columns[0] %}
+              <p class="muted">Valid for: {{ c.includes | join(", ") if c.includes else c.title }}</p>
+            {% endif %}
+
+            <div class="table-scroll">
+              <table class="ticket-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Ticket</th>
+                    {% for c in s.columns %}
+                      <th scope="col">
+                        {{ "Price" if single else c.title }}
+                      </th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in s.rows %}
+                    <tr>
+                      <th scope="row">{{ row.audience }}</th>
+                      {% for cell in row.cells %}
+                        {% if cell is none %}
+                          <td class="muted">—</td>
+                        {% else %}
+                          <td>
+                            {% for entry in cell %}
+                              {{ entry.price }}{% if cell | length > 1 %} <span class="muted">({{ entry.label }})</span>{% endif %}{% if not loop.last %}<br>{% endif %}
+                            {% endfor %}
+                          </td>
+                        {% endif %}
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+
+                  {% if s.rule_rows %}
+                    <tr class="rule-heading">
+                      <th scope="colgroup" colspan="{{ s.columns | length + 1 }}">Special access</th>
+                    </tr>
+                    {% for r in s.rule_rows %}
+                      <tr>
+                        <th scope="row">
+                          {{ r.label }}<br>
+                          <span class="muted">{{ r.when }}{% if r.who %} · {{ r.who }}{% endif %}</span>
+                        </th>
+                        {% for cell in r.cells %}
+                          {% if cell is none %}
+                            <td class="muted">—</td>
+                          {% else %}
+                            <td>{% for entry in cell %}{{ entry.price }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+                          {% endif %}
+                        {% endfor %}
+                      </tr>
+                    {% endfor %}
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </section>
+  </article>
+
+  <script>
+    // Period buttons (opening hours and ticket prices): inside each group of
+    // buttons, show the selected period's table and hide the others.
+    (function () {
+      document.querySelectorAll(".period-tabs").forEach(function (group) {
+        var tabs = group.querySelectorAll(".period-tab");
         tabs.forEach(function (tab) {
           tab.addEventListener("click", function () {
             tabs.forEach(function (currentTab) {
@@ -182,33 +275,7 @@
             });
           });
         });
-      })();
-    </script>
-
-
-
-
-    <section>
-      <h2>Tickets</h2>
-      {% if museum.tickets %}
-        <table class="ticket-table">
-          <thead>
-            <tr><th>Ticket</th><th>Price</th></tr>
-          </thead>
-          <tbody>
-            {% for t in museum.tickets | sort(attribute="price", reverse=true) %}
-              <tr>
-                <td>{{ t.label }}</td>
-                <td>
-                  {% if t.price == 0 %}Free{% else %}{{ "%.2f"|format(t.price) }} {{ t.currency }}{% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <p class="muted">No ticket information yet.</p>
-      {% endif %}
-    </section>
-  </article>
+      });
+    })();
+  </script>
 {% endblock %}

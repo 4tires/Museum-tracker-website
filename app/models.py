@@ -1,4 +1,4 @@
-from sqlalchemy import String, Text, ForeignKey, UniqueConstraint, CheckConstraint, Numeric, Table, Column, Enum, Integer, Time
+from sqlalchemy import String, Text, ForeignKey, UniqueConstraint, CheckConstraint, Numeric, Table, Column, Enum, Integer, Time, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from flask_login import UserMixin
 
@@ -37,6 +37,7 @@ class Museum(db.Model):
     description: Mapped[Optional[str]] = mapped_column(Text)
     website: Mapped[Optional[str]] = mapped_column(String(254))
     image_url: Mapped[Optional[str]] = mapped_column(String(254))
+    notes: Mapped[Optional[str]] = mapped_column(Text)
     address: Mapped[str] = mapped_column(String(254))
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc)
@@ -320,7 +321,19 @@ class Ticket(AudienceConditionsMixin, ScheduleConditionsMixin, db.Model):
 
     # Constraints
     __table_args__ = (
-        UniqueConstraint("museum_id", "label", name="uq_ticket_museum_label"),
+        # Same label may exist in different yearly periods (summer / winter).
+        UniqueConstraint(
+            "museum_id", "label", "month_from", "day_from", "month_to", "day_to",
+            name="uq_ticket_museum_label_period",
+        ),
+        # NULLs count as distinct in a UNIQUE constraint, so the one above can't
+        # catch two year-round rows with the same label. This partial index does.
+        Index(
+            "uq_ticket_museum_label_year_round", "museum_id", "label",
+            unique=True,
+            sqlite_where=text("month_from IS NULL"),
+            postgresql_where=text("month_from IS NULL"),
+        ),
         CheckConstraint("price >= 0", name="ck_ticket_price_nonneg"),
         CheckConstraint(
             "min_age IS NULL OR max_age IS NULL OR min_age <= max_age",
@@ -345,6 +358,18 @@ class Ticket(AudienceConditionsMixin, ScheduleConditionsMixin, db.Model):
         CheckConstraint(
             "start_time IS NULL OR end_time IS NULL OR start_time < end_time",
             name="ck_ticket_time_range",
+        ),
+        # Yearly period (same rule as opening hours)
+        CheckConstraint(
+            "(month_from IS NULL AND month_to IS NULL) "
+            "OR (month_from BETWEEN 1 AND 12 AND month_to BETWEEN 1 AND 12 "
+            "AND month_from <= month_to)",
+            name="ck_ticket_month_range",
+        ),
+        CheckConstraint(
+            "(day_from IS NULL OR day_from BETWEEN 1 AND 31) "
+            "AND (day_to IS NULL OR day_to BETWEEN 1 AND 31)",
+            name="ck_ticket_period_days",
         ),
     )
 

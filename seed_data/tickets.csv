@@ -26,25 +26,57 @@ Museu do Oriente;Lisbon;Senior;4,5;EUR;;;;;65;;;;;;;;;;;;;
 Museu do Oriente;Lisbon;Lisboa Card;8;EUR;;Lisboa Card;;;;;;;;;;;;;;;;
 Museu do Oriente;Lisbon;Baby;0;EUR;;;;;;5;;;;;;;;;;;;
 Museu do Oriente;Lisbon;Friday evenings;0;EUR;;;;;;;;FRIDAY;;18:00;20:00;;;;;;;
-MACAM;Lisbon;General Entry;15;EUR;All exhibitions;;;;;;;;;;;;;;;;;
-MACAM;Lisbon;Permanent Exhibition;8;EUR;;;;;;;;;;;;;;;;;;
-MACAM;Lisbon;Temporary Exhibition;6;EUR;For only 1 temporary exhibition;;;;;;;;;;;;;;;;;
-MACAM;Lisbon;Pack - Temporary Exhibitions;10;EUR;All temporary exhibitions;;;;;;;;;;;;;;;;;
-MACAM;Lisbon;General Entry Young;7,5;EUR;;;;;13;18;;;;;;;;;;;;
-MACAM;Lisbon;Permanent Exhibition Young;4;EUR;;;;;13;18;;;;;;;;;;;;
-MACAM;Lisbon;Temporary Exhibition Young;3;EUR;;;;;13;18;;;;;;;;;;;;
-MACAM;Lisbon;Pack - Temporary Exhibitions Young;5;EUR;;;;;13;18;;;;;;;;;;;;
-MACAM;Lisbon;General Entry Student;7,5;EUR;;;;;;25;1;;;;;;;;;;;
-MACAM;Lisbon;Permanent Exhibition Student;4;EUR;;;;;;25;1;;;;;;;;;;;
-MACAM;Lisbon;Temporary Exhibition Student;3;EUR;;;;;;25;1;;;;;;;;;;;
-MACAM;Lisbon;Pack - Temporary Exhibitions Student;5;EUR;;;;;;25;1;;;;;;;;;;;
-MACAM;Lisbon;General Entry Senior;7,5;EUR;;;;;65;;;;;;;;;;;;;
-MACAM;Lisbon;Permanent Exhibition Senior;4;EUR;;;;;65;;;;;;;;;;;;;
-MACAM;Lisbon;Temporary Exhibition Senior;3;EUR;;;;;65;;;;;;;;;;;;;
-MACAM;Lisbon;Pack - Temporary Exhibitions Senior;5;EUR;;;;;65;;;;;;;;;;;;;
-MACAM;Lisbon;General Entry Lisboa Card;13,5;EUR;;Lisboa Card;;;;;;;;;;;;;;;;
-MACAM;Lisbon;Permanent Exhibition Lisboa Card;7,2;EUR;;Lisboa Card;;;;;;;;;;;;;;;;
-MACAM;Lisbon;Temporary Exhibition Lisboa Card;5,4;EUR;;Lisboa Card;;;;;;;;;;;;;;;;
-MACAM;Lisbon;Pack - Temporary Exhibitions Lisboa Card;9;EUR;;Lisboa Card;;;;;;;;;;;;;;;;
-MACAM;Lisbon;First Monday of the month;0;EUR;;;;;;;;MONDAY;1;10;14;;;;;;;
-MACAM;Lisbon;Child;0;EUR;;;;;;12;;;;;;;;;;;;
+MACAM;Lisbon;General Entry;15;EUR;All exhibitions;;;;;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Permanent Exhibition;8;EUR;;;;;;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Weight-Counter-Weight;6;EUR;;;;;;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Other Spaces (Fault line);6;EUR;;;;;;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Pack - Temporary Exhibitions;10;EUR;All temporary exhibitions;;;;;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;General Entry Young;7,5;EUR;;;;;13;18;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Permanent Exhibition Young;4;EUR;;;;;13;18;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Weight-Counter-Weight Young;3;EUR;;;;;13;18;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Other Spaces (Fault line) Young;3;EUR;;;;;13;18;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Pack - Temporary Exhibitions Young;5;EUR;;;;;13;18;;;;;;;;;1;1;8;31
+MACAM;Lisbon;General Entry Student;7,5;EUR;;;;;;25;1;;;;;;;;1;1;8;31
+MACAM;Lisbon;Permanent Exhibition Student;4;EUR;;;;;;25;1;;;;;;;;1;1;8;31
+MACAM;Lisbon;Weight-Counter-Weight Student;3;EUR;;;;;;25;1;;;;;;;;1;1;8;31
+MACAM;Lisbon;Other Spaces (Fault line) Student;3;EUR;;;;;;25;1;;;;;;;;1;1;8;31
+MACAM;Lisbon;Pack - Temporary Exhibitions Student;5;EUR;;;;;;25;1;;;;;;;;1;1;8;31
+MACAM;Lisbon;General Entry Senior;7,5;EUR;;;;;65;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Permanent Exhibition Senior;4;EUR;;;;;65;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Weight-Counter-Weight Senior;3;EUR;;;;;65;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Other Spaces (Fault line) Senior;3;EUR;;;;;65;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Pack - Temporary Exhibitions Senior;5;EUR;;;;;65;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;General Entry Lisboa Card;13,5;EUR;;Lisboa Card;;;;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Permanent Exhibition Lisboa Card;7,2;EUR;;Lisboa Card;;;;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Weight-Counter-Weight Lisboa Card;5,4;EUR;;Lisboa Card;;;;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Other Spaces (Fault line) Lisboa Card;5,4;EUR;;Lisboa Card;;;;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;Pack - Temporary Exhibitions Lisboa Card;9;EUR;;Lisboa Card;;;;;;;;;;;;;1;1;8;31
+MACAM;Lisbon;First Monday of the month;0;EUR;;;;;;;;MONDAY;1;10;14;;;;1;1;8;31
+MACAM;Lisbon;Child;0;EUR;;;;;;12;;;;;;;;;1;1;8;31
+MACAM;Lisbon;General Entry;30;EUR;All exhibitions;;;;;;;;;;;;;;9;;12;
+MACAM;Lisbon;Permanent Exhibition;16;EUR;;;;;;;;;;;;;;;9;;12;
+MACAM;Lisbon;Weight-Counter-Weight;12;EUR;;;;;;;;;;;;;;;9;;12;
+MACAM;Lisbon;Other Spaces (Fault line);12;EUR;;;;;;;;;;;;;;;9;;12;
+MACAM;Lisbon;Pack - Temporary Exhibitions;20;EUR;All temporary exhibitions;;;;;;;;;;;;;;9;;12;
+MACAM;Lisbon;General Entry Young;15;EUR;;;;;13;18;;;;;;;;;9;;12;
+MACAM;Lisbon;Permanent Exhibition Young;8;EUR;;;;;13;18;;;;;;;;;9;;12;
+MACAM;Lisbon;Weight-Counter-Weight Young;6;EUR;;;;;13;18;;;;;;;;;9;;12;
+MACAM;Lisbon;Other Spaces (Fault line) Young;6;EUR;;;;;13;18;;;;;;;;;9;;12;
+MACAM;Lisbon;Pack - Temporary Exhibitions Young;10;EUR;;;;;13;18;;;;;;;;;9;;12;
+MACAM;Lisbon;General Entry Student;15;EUR;;;;;;25;1;;;;;;;;9;;12;
+MACAM;Lisbon;Permanent Exhibition Student;8;EUR;;;;;;25;1;;;;;;;;9;;12;
+MACAM;Lisbon;Weight-Counter-Weight Student;6;EUR;;;;;;25;1;;;;;;;;9;;12;
+MACAM;Lisbon;Other Spaces (Fault line) Student;6;EUR;;;;;;25;1;;;;;;;;9;;12;
+MACAM;Lisbon;Pack - Temporary Exhibitions Student;10;EUR;;;;;;25;1;;;;;;;;9;;12;
+MACAM;Lisbon;General Entry Senior;15;EUR;;;;;65;;;;;;;;;;9;;12;
+MACAM;Lisbon;Permanent Exhibition Senior;8;EUR;;;;;65;;;;;;;;;;9;;12;
+MACAM;Lisbon;Weight-Counter-Weight Senior;6;EUR;;;;;65;;;;;;;;;;9;;12;
+MACAM;Lisbon;Other Spaces (Fault line) Senior;6;EUR;;;;;65;;;;;;;;;;9;;12;
+MACAM;Lisbon;Pack - Temporary Exhibitions Senior;10;EUR;;;;;65;;;;;;;;;;9;;12;
+MACAM;Lisbon;General Entry Lisboa Card;27;EUR;;Lisboa Card;;;;;;;;;;;;;9;;12;
+MACAM;Lisbon;Permanent Exhibition Lisboa Card;14,4;EUR;;Lisboa Card;;;;;;;;;;;;;9;;12;
+MACAM;Lisbon;Weight-Counter-Weight Lisboa Card;10,8;EUR;;Lisboa Card;;;;;;;;;;;;;9;;12;
+MACAM;Lisbon;Other Spaces (Fault line) Lisboa Card;10,8;EUR;;Lisboa Card;;;;;;;;;;;;;9;;12;
+MACAM;Lisbon;Pack - Temporary Exhibitions Lisboa Card;18;EUR;;Lisboa Card;;;;;;;;;;;;;9;;12;
+MACAM;Lisbon;First Monday of the month;0;EUR;;;;;;;;MONDAY;1;10;14;;;;9;;12;
+MACAM;Lisbon;Child;0;EUR;;;;;;12;;;;;;;;;9;;12;

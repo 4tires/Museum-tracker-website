@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Museum Tracker · {{ museum.name }} · Past exhibitions{% endblock %}
+
+{% block content %}
+  <p><a href="{{ url_for('museums.museum', museum_id=museum.id) }}">← {{ museum.name }}</a></p>
+
+  <h1>Past exhibitions</h1>
+
+  {% if exhibitions.archived %}
+    <ul class="exhibition-list">
+      {% for e in exhibitions.archived %}
+        <li>
+          <strong>
+            {% if e.website %}
+              <a href="{{ e.website }}" target="_blank" rel="noopener noreferrer">{{ e.name }}</a>
+            {% else %}
+              {{ e.name }}
+            {% endif %}
+          </strong>
+          <span class="muted">
+            ({{ e.start_date.strftime("%d/%m/%Y") if e.start_date else "…" }}
+            – {{ e.end_date.strftime("%d/%m/%Y") }})
+          </span>
+          {% if e.short_description %}<br><span class="muted">{{ e.short_description }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No past exhibitions listed yet.</p>
+  {% endif %}
+{% endblock %}

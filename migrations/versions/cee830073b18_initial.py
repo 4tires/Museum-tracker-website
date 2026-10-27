@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: 7f2db604ef02
+Revision ID: cee830073b18
 Revises: 
-Create Date: 2026-10-24 17:56:22.235179
+Create Date: 2026-10-25 19:15:26.175244
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '7f2db604ef02'
+revision = 'cee830073b18'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -26,6 +26,7 @@ def upgrade():
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('website', sa.String(length=254), nullable=True),
     sa.Column('image_url', sa.String(length=254), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
     sa.Column('address', sa.String(length=254), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
@@ -182,6 +183,8 @@ def upgrade():
     sa.Column('day_from', sa.Integer(), nullable=True),
     sa.Column('month_to', sa.Integer(), nullable=True),
     sa.Column('day_to', sa.Integer(), nullable=True),
+    sa.CheckConstraint('(day_from IS NULL OR day_from BETWEEN 1 AND 31) AND (day_to IS NULL OR day_to BETWEEN 1 AND 31)', name='ck_ticket_period_days'),
+    sa.CheckConstraint('(month_from IS NULL AND month_to IS NULL) OR (month_from BETWEEN 1 AND 12 AND month_to BETWEEN 1 AND 12 AND month_from <= month_to)', name='ck_ticket_month_range'),
     sa.CheckConstraint('(weekday IS NULL AND month IS NULL AND day IS NULL AND NOT holidays) OR (weekday IS NOT NULL AND month IS NULL AND day IS NULL AND NOT holidays) OR (weekday IS NULL AND month IS NOT NULL AND day IS NOT NULL AND NOT holidays) OR (weekday IS NULL AND month IS NULL AND day IS NULL AND holidays)', name='ck_ticket_schedule_kind'),
     sa.CheckConstraint('day IS NULL OR day BETWEEN 1 AND 31', name='ck_free_rule_day'),
     sa.CheckConstraint('min_age IS NULL OR max_age IS NULL OR min_age <= max_age', name='ck_ticket_age_range'),
@@ -194,8 +197,11 @@ def upgrade():
     sa.ForeignKeyConstraint(['museum_id'], ['museum.id'], ),
     sa.ForeignKeyConstraint(['pass_id'], ['passes.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('museum_id', 'label', name='uq_ticket_museum_label')
+    sa.UniqueConstraint('museum_id', 'label', 'month_from', 'day_from', 'month_to', 'day_to', name='uq_ticket_museum_label_period')
     )
+    with op.batch_alter_table('tickets', schema=None) as batch_op:
+        batch_op.create_index('uq_ticket_museum_label_year_round', ['museum_id', 'label'], unique=True, sqlite_where=sa.text('month_from IS NULL'), postgresql_where=sa.text('month_from IS NULL'))
+
     op.create_table('exhibition_reviews',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -245,6 +251,9 @@ def downgrade():
     op.drop_table('exhibition_wishlist')
     op.drop_table('exhibition_visits')
     op.drop_table('exhibition_reviews')
+    with op.batch_alter_table('tickets', schema=None) as batch_op:
+        batch_op.drop_index('uq_ticket_museum_label_year_round', sqlite_where=sa.text('month_from IS NULL'), postgresql_where=sa.text('month_from IS NULL'))
+
     op.drop_table('tickets')
     op.drop_table('pass_prices')
     op.drop_table('opening_hours')

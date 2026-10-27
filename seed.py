@@ -45,6 +45,10 @@ def get_or_create(model, defaults=None, **lookup):
 # CSV Logic
 DATA_DIR = Path(__file__).parent / "seed_data"
 
+# The yearly period of a ticket (e.g. a summer price vs a winter price).
+# All four empty = year-round.
+PERIOD_FIELDS = ("month_from", "day_from", "month_to", "day_to")
+
 def read_rows(filename):
     with open(DATA_DIR / filename, newline="", encoding="utf-8-sig") as f:
         for row in csv.DictReader(f, delimiter=";"):
@@ -215,6 +219,8 @@ def seed_pass_prices(museum_passes):
         )
 
 def seed_tickets(museums, museum_passes):
+    # A ticket is identified by museum + label + yearly period, because the same
+    # label (e.g. "General Entry") can exist once per period (summer / winter).
     result = {}
     for row in read_rows("tickets.csv"):
         museum = museums[(row["museum_name"], row["museum_city"])]
@@ -240,23 +246,38 @@ def seed_tickets(museums, museum_passes):
         row["day"] = parse_int(row["day"])
         row["holidays"] = parse_bool(row["holidays"])
 
-        row["month_from"] = parse_int(row["month_from"])
-        row["day_from"] = parse_int(row["day_from"])
-        row["month_to"] = parse_int(row["month_to"])
-        row["day_to"] = parse_int(row["day_to"])
+        # The period is part of the lookup, not of the defaults.
+        period = {f: parse_int(row.pop(f)) for f in PERIOD_FIELDS}
 
-        result[(museum.id, label)] = get_or_create(Ticket, museum_id=museum.id, label=label, defaults=row)
+        ticket = get_or_create(
+            Ticket, museum_id=museum.id, label=label, **period, defaults=row
+        )
+        result[(museum.id, label, tuple(period.values()))] = ticket
 
     return result
 
 def seed_ticket_exhibition(tickets, exhibitions, museums):
+    """Link tickets to the exhibitions they give access to.
+
+    A row names a ticket by museum + label. If that label exists in several
+    yearly periods, the row links all of them, unless it fills in the optional
+    month_from / day_from / month_to / day_to columns, which then link only the
+    ticket of that period.
+    """
+    by_label = {}
+    for (museum_id, label, period), ticket in tickets.items():
+        by_label.setdefault((museum_id, label), []).append((period, ticket))
+
     for row in read_rows("ticket_exhibition.csv"):
         museum = museums[(row["museum_name"], row["museum_city"])]
-        ticket = tickets[(museum.id, row["ticket_label"])]
         exhibition = exhibitions[(museum.id, row["exhibition_name"])]
+        wanted = tuple(parse_int(row.get(f)) for f in PERIOD_FIELDS)
 
-        if exhibition not in ticket.exhibitions:
-            ticket.exhibitions.append(exhibition)
+        for period, ticket in by_label[(museum.id, row["ticket_label"])]:
+            if wanted != (None, None, None, None) and period != wanted:
+                continue
+            if exhibition not in ticket.exhibitions:
+                ticket.exhibitions.append(exhibition)
 
 def seed_opening_hours(museums):
     result = {}

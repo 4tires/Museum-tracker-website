@@ -31,7 +31,12 @@ body {
 .exhibition-list li { margin-bottom: 0.75rem; }
 
 .ticket-table { border-collapse: collapse; width: 100%; }
-.ticket-table th, .ticket-table td { text-align: left; padding: 0.4rem 0.75rem; border-bottom: 1px solid #ddd; }
+.ticket-table th, .ticket-table td { text-align: left; padding: 0.4rem 0.75rem; border-bottom: 1px solid #ddd; vertical-align: top; }
+.ticket-table thead th { font-weight: 600; }
+.ticket-table tbody th { font-weight: 500; white-space: nowrap; }
+.table-scroll { overflow-x: auto; margin-bottom: 1rem; }
+.ticket-table .rule-heading th { background: #f6f6f6; font-weight: 600; padding-top: 0.6rem; }
+.ticket-table tbody th .muted { font-weight: 400; white-space: normal; }
 
 @media (max-width: 600px) {
   .museum-header { flex-direction: column; align-items: flex-start; }
