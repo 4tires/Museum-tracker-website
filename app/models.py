@@ -19,6 +19,10 @@ class User(UserMixin, db.Model):
     email: Mapped[str] = mapped_column(String(254), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(default=False)
+    birth_date: Mapped[date]
+    is_student: Mapped[bool] = mapped_column(default=False)
+    resident_country: Mapped[str] = mapped_column(String(50))
+    resident_municipality: Mapped[str] = mapped_column(String(50))
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc)
     )
@@ -26,6 +30,7 @@ class User(UserMixin, db.Model):
     def __repr__(self) -> str:
         return f"User(id={self.id!r}, username={self.username!r})"
 
+# Museum tables
 class Museum(db.Model):
     __tablename__ = "museum"
 
@@ -39,6 +44,9 @@ class Museum(db.Model):
     image_url: Mapped[Optional[str]] = mapped_column(String(254))
     notes: Mapped[Optional[str]] = mapped_column(Text)
     address: Mapped[str] = mapped_column(String(254))
+    has_lockers: Mapped[Optional[bool]]          # None = unknown, False = confirmed no
+    locker_notes: Mapped[Optional[str]]          # size limits, coin/deposit, large luggage
+
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc)
     )
@@ -68,38 +76,6 @@ class Museum(db.Model):
         back_populates="museum", cascade="all, delete-orphan"
     )
 
-class Exhibition(db.Model):
-    __tablename__ = "exhibition"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    museum_id: Mapped[int] = mapped_column(ForeignKey("museum.id"))
-    name: Mapped[str] = mapped_column(String(200))
-    short_description: Mapped[Optional[str]] = mapped_column(Text)
-    long_description: Mapped[Optional[str]] = mapped_column(Text)
-    website: Mapped[Optional[str]] = mapped_column(String(254))
-    image_url: Mapped[Optional[str]] = mapped_column(String(254))
-    is_permanent: Mapped[bool] = mapped_column(default=False)
-    start_date: Mapped[Optional[date]]
-    end_date: Mapped[Optional[date]]
-
-    # Constraints
-    __table_args__ = (
-        CheckConstraint(
-            "start_date IS NULL OR end_date IS NULL OR start_date <= end_date",
-            name="ck_exhibition_date_range",
-        ),
-        CheckConstraint("NOT is_permanent OR end_date IS NULL", name="ck_permanent_wth_date"),
-        UniqueConstraint("museum_id", "name", name="uq_exhibition_museum_name")
-    )
-
-    # Relationships
-    museum: Mapped["Museum"] = relationship(back_populates="exhibitions")
-    tickets: Mapped[list["Ticket"]] = relationship(
-        secondary="ticket_exhibition", back_populates="exhibitions"
-    )
-
-
-# Museum tables
 class MuseumVisit(db.Model):
     __tablename__ = "museum_visits"
 
@@ -160,17 +136,51 @@ class MuseumReview(db.Model):
     museum: Mapped["Museum"] = relationship(backref="museum_reviews")
 
 # Exhibition tables
+class Exhibition(db.Model):
+    __tablename__ = "exhibition"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    museum_id: Mapped[int] = mapped_column(ForeignKey("museum.id"))
+    name: Mapped[str] = mapped_column(String(200))
+    short_description: Mapped[Optional[str]] = mapped_column(Text)
+    long_description: Mapped[Optional[str]] = mapped_column(Text)
+    website: Mapped[Optional[str]] = mapped_column(String(254))
+    image_url: Mapped[Optional[str]] = mapped_column(String(254))
+    is_permanent: Mapped[bool] = mapped_column(default=False)
+    start_date: Mapped[Optional[date]]
+    end_date: Mapped[Optional[date]]
+    typical_duration_minutes: Mapped[Optional[int]] # Official recommendation from the museum
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint("museum_id", "name", name="uq_exhibition_museum_name")
+        CheckConstraint(
+            "start_date IS NULL OR end_date IS NULL OR start_date <= end_date",
+            name="ck_exhibition_date_range",
+        ),
+        CheckConstraint("NOT is_permanent OR end_date IS NULL", name="ck_permanent_wth_date"),
+        CheckConstraint("duration_minutes > 0", name="ck_visit_duration_nonneg")
+    )
+
+    # Relationships
+    museum: Mapped["Museum"] = relationship(back_populates="exhibitions")
+    tickets: Mapped[list["Ticket"]] = relationship(
+        secondary="ticket_exhibition", back_populates="exhibitions"
+    )
+
 class ExhibitionVisit(db.Model):
     __tablename__ = "exhibition_visits"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
     exhibition_id: Mapped[int] = mapped_column(ForeignKey("exhibition.id"))
-    visit_date: Mapped[date] = mapped_column()
+    visit_date: Mapped[date]
+    duration_minutes: Optional[int]
 
     # Unique rows with [user, exhibition]
     __table_args__ = (
         UniqueConstraint("user_id", "exhibition_id", "visit_date", name="uq_user_exhibition_visit"),
+        CheckConstraint("duration_minutes > 0", name="ck_visit_duration_nonneg")
     )
 
     # Relationships
@@ -223,6 +233,7 @@ class MuseumPass(db.Model):
     __tablename__ = "passes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    includes_transport: Mapped[bool] = mapped_column(default=False)
     name: Mapped[str] = mapped_column(String(100), unique=True) # Include period in the name (e.g. "24h", "48h", "72h", "Year")
     website: Mapped[Optional[str]] = mapped_column(String(254))
     notes: Mapped[Optional[str]] = mapped_column(Text)
@@ -312,6 +323,17 @@ class ScheduleConditionsMixin:
     month_to: Mapped[Optional[int]]
     day_to: Mapped[Optional[int]]
 
+class EntryPolicy(enum.Enum):
+    # How the user must book/enter the museum.
+    anytime = "anytime"               # Walk-in, no reservation needed
+    recommended = "recommended"       # Walk-in allowed, but booking recommended to skip lines
+    timed_slot = "timed_slot"         # Must reserve a specific time slot in advance
+
+class Validity(enum.Enum):
+    single_entry = "single_entry"
+    same_day = "same_day"
+    period = "period"
+
 class Ticket(AudienceConditionsMixin, ScheduleConditionsMixin, db.Model):
     __tablename__ = "tickets"
 
@@ -322,6 +344,18 @@ class Ticket(AudienceConditionsMixin, ScheduleConditionsMixin, db.Model):
     currency: Mapped[str] = mapped_column(String(3), default="EUR")
     notes: Mapped[Optional[str]] = mapped_column(Text)
     pass_id: Mapped[Optional[int]] = mapped_column(ForeignKey("passes.id", ondelete="RESTRICT"))
+    entry_policy: Mapped[EntryPolicy] = mapped_column(
+        Enum(EntryPolicy, native_enum=False, create_constraint=True, name="entry_policy"),
+        default=EntryPolicy.ANYTIME
+    )
+    validity: Mapped[Validity] = mapped_column(
+        Enum(Validity, native_enum=False, create_constraint=True, name="validity"),
+        default=Validity.single_entry,
+    )
+    validity_value: Mapped[Optional[int]]                 # with validity=period
+    validity_unit: Mapped[Optional[DurationUnit]] = mapped_column(
+        Enum(DurationUnit, native_enum=False, create_constraint=True, name="ticket_validity_unit")
+    )
 
     # Constraints
     __table_args__ = (
@@ -374,6 +408,15 @@ class Ticket(AudienceConditionsMixin, ScheduleConditionsMixin, db.Model):
             "(day_from IS NULL OR day_from BETWEEN 1 AND 31) "
             "AND (day_to IS NULL OR day_to BETWEEN 1 AND 31)",
             name="ck_ticket_period_days",
+        ),
+        CheckConstraint(
+            "(validity = 'period' AND validity_value IS NOT NULL AND validity_unit IS NOT NULL) "
+            "OR (validity != 'period' AND validity_value IS NULL AND validity_unit IS NULL)",
+            name="ck_ticket_validity_period",
+        ),
+        CheckConstraint(
+            "validity_value IS NULL OR validity_value > 0",
+            name="ck_ticket_validity_positive",
         ),
     )
 
@@ -442,11 +485,17 @@ class Language(db.Model):
     code: Mapped[str] = mapped_column(String(8), unique=True)   # "pt", "en", "pt-BR"
     name: Mapped[str] = mapped_column(String(50))                # "Portuguese"
 
+    # Relationships
+    guided_visits: Mapped[list["GuidedVisit"]] = relationship(
+        secondary=guided_visit_languages,
+        back_populates="languages"
+    )
+
 # Association table between Museum and Language
 museum_language = Table(
     "museum_language",
     db.metadata,
-    Column("museum_id", ForeignKey("museums.id"), primary_key=True),
+    Column("museum_id", ForeignKey("museum.id"), primary_key=True),
     Column("language_id", ForeignKey("languages.id"), primary_key=True),
 )
 
@@ -484,8 +533,93 @@ audioguide_language = Table(
     "audioguide_language",
     db.metadata,
     Column("audioguide_id", ForeignKey("audioguides.id", ondelete="CASCADE"), primary_key=True),
-    Column("language_id", ForeignKey("language.id"), primary_key=True),
+    Column("language_id", ForeignKey("languages.id"), primary_key=True),
 )
+
+class GuidedVisit(ScheduleConditionsMixin, db.Model):
+    __tablename__ = "guided_visits"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    museum_id: Mapped[int] = mapped_column(ForeignKey("museum.id", ondelete="CASCADE"))
+    exhibition_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("exhibition.id", ondelete="SET NULL")
+    )
+    
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    
+    # --- Tour-specific fields ---
+    duration_minutes: Mapped[int]
+    max_participants: Mapped[Optional[int]]
+    price: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 2))
+    currency: Mapped[str] = mapped_column(String(3), default="EUR")
+    requires_reservation: Mapped[bool] = mapped_column(default=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    __table_args__ = (
+        # 1. Tour specific constraints
+        CheckConstraint("duration_minutes > 0", name="ck_guided_visit_duration_positive"),
+        CheckConstraint(
+            "max_participants IS NULL OR max_participants > 0",
+            name="ck_guided_visit_max_participants",
+        ),
+        CheckConstraint("price IS NULL OR price >= 0", name="ck_guided_visit_price_nonneg"),
+        
+        # 2. Mixin field validity constraints (allowing NULLs, but restricting ranges if populated)
+        CheckConstraint("weekday IS NULL OR weekday BETWEEN 0 AND 6", name="ck_guided_visit_weekday"),
+        CheckConstraint(
+            "week_of_month IS NULL OR week_of_month IN (-1, 1, 2, 3, 4, 5)",
+            name="ck_guided_visit_week_of_month",
+        ),
+        CheckConstraint("month IS NULL OR month BETWEEN 1 AND 12", name="ck_guided_visit_month"),
+        CheckConstraint("day IS NULL OR day BETWEEN 1 AND 31", name="ck_guided_visit_day"),
+        
+        # 3. The "Must have a valid schedule" constraint
+        # A tour MUST have a start_time, AND it must be either a weekly schedule, 
+        # a specific date, or a holiday.
+        CheckConstraint(
+            "start_time IS NOT NULL AND ("
+            "weekday IS NOT NULL OR "
+            "(month IS NOT NULL AND day IS NOT NULL) OR "
+            "holidays = True"
+            ")",
+            name="ck_guided_visit_has_schedule"
+        ),
+
+        # 4. Seasonal validity (if month_from is set, the rest must be set)
+        CheckConstraint(
+            "month_from IS NULL OR (month_to IS NOT NULL AND day_from IS NOT NULL AND day_to IS NOT NULL)",
+            name="ck_guided_visit_seasonal_pair",
+        ),
+        
+        # 5. Unique constraint to prevent duplicate tours at the exact same time
+        # Note: Because these fields can be NULL, SQL treats NULLs as distinct. 
+        # This is generally fine for preventing obvious duplicates.
+        UniqueConstraint(
+            "museum_id", "name", "weekday", "week_of_month", "month", "day", "holidays", "start_time", 
+            name="uq_guided_visit_slot"
+        ),
+    )
+
+    # Relationships
+    museum: Mapped["Museum"] = relationship(back_populates="guided_visits")
+    exhibition: Mapped[Optional["Exhibition"]] = relationship()
+    languages: Mapped[list["Language"]] = relationship(
+        secondary=guided_visit_languages,
+        back_populates="guided_visits",
+        lazy="selectin"
+    )
+
+    def __repr__(self) -> str:
+        return f"GuidedVisit(id={self.id!r}, name={self.name!r})"
+
+guided_visit_languages = Table(
+    "guided_visit_languages",
+    db.Model.metadata,
+    Column("guided_visit_id", ForeignKey("guided_visits.id", ondelete="CASCADE"), primary_key=True),
+    Column("language_id", ForeignKey("languages.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 @login_manager.user_loader
 def load_user(user_id):
