@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros.html" import note %}
 
 {% block title %}Museum Tracker · {{ exhibition.name }}{% endblock %}
 
@@ -28,6 +29,11 @@
             </dd>
           {% endif %}
 
+          {% if duration %}
+            <dt>Visit time</dt>
+            <dd>{{ duration }} <span class="muted">(recommended by the museum)</span></dd>
+          {% endif %}
+
           {% if archived %}
             <dt>Status</dt>
             <dd>Ended</dd>
@@ -51,5 +57,24 @@
         <p class="muted">No description yet.</p>
       {% endif %}
     </section>
+
+    {% if guided_visits %}
+      <section class="guided-visits">
+        <h2>Guided visits</h2>
+        <ul class="info-list">
+          {% for g in guided_visits %}
+            <li>
+              <strong>{{ g.name }}</strong>{{ note(g.notes) }}
+              <br>{{ g.when }}{% if g.period %} <span class="muted">({{ g.period }})</span>{% endif %}
+              <br><span class="muted">
+                {{ g.duration }} · {{ g.price }}{% if g.details %} · {{ g.details | join(" · ") }}{% endif %}
+              </span>
+              {% if g.languages %}<br><span class="muted">Languages: {{ g.languages }}</span>{% endif %}
+              {% if g.description %}<br><span class="muted">{{ g.description }}</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
   </article>
 {% endblock %}

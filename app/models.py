@@ -78,6 +78,8 @@ class Museum(db.Model):
     guided_visits: Mapped[list["GuidedVisit"]] = relationship(
         back_populates="museum", cascade="all, delete-orphan"
     )
+    # Languages of the museum's display texts (uses the museum_language table below)
+    languages: Mapped[list["Language"]] = relationship(secondary="museum_language")
 
 class MuseumVisit(db.Model):
     __tablename__ = "museum_visits"

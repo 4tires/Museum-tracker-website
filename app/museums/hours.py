@@ -36,6 +36,7 @@ ORDINALS = {1: "First", 2: "Second", 3: "Third", 4: "Fourth", 5: "Fifth", -1: "L
 class Slot:
     hours: str        # "10:00–18:00", or "Closed"
     last_entry: str   # "17:30", or "" if none
+    notes: str = ""   # shown as a "?" tooltip
 
 
 @dataclass
@@ -178,7 +179,7 @@ def build_opening_hours(rows: Iterable) -> OpeningHoursView:
             title="All year" if year_round else period_text(*period),
             is_year_round=year_round,
             days=[
-                DayHours(WEEKDAYS[i], [Slot(*_fmt_hours(h)) for h in sorted(by_period[period][i], key=_start)])
+                DayHours(WEEKDAYS[i], [Slot(*_fmt_hours(h), notes=h.notes or "") for h in sorted(by_period[period][i], key=_start)])
                 for i in range(7)
             ],
         ))

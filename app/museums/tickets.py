@@ -44,6 +44,7 @@ CURRENCY_SYMBOLS = {"EUR": "€"}
 class Entry:
     price: str         # "€15.00", "Free", "Included in pass"
     label: str         # the stored ticket label (shown only if a cell has several)
+    notes: str = ""    # ticket notes (+ pass price notes), shown as a "?" tooltip
 
 
 @dataclass
@@ -56,6 +57,7 @@ class Column:
 class TicketRow:
     audience: str                         # "Full price", "Ages 65+", "Lisboa Card"
     cells: list[Optional[list[Entry]]]    # one per column; None = not sold
+    notes: str = ""                       # the pass's notes, for pass rows
 
 
 @dataclass
@@ -150,10 +152,10 @@ def _audience_sort_key(t) -> tuple:
 def _set_title(ids: frozenset, current: list) -> str:
     all_ids = frozenset(e.id for e in current)
     by_id = {e.id: e for e in current}
-    if len(ids) == 1:
-        return by_id[next(iter(ids))].name
     if ids == all_ids:
         return "All exhibitions"
+    if len(ids) == 1:
+        return by_id[next(iter(ids))].name
     permanent = frozenset(e.id for e in current if e.is_permanent)
     temporary = all_ids - permanent
     if ids == temporary:
@@ -177,6 +179,28 @@ def _money(amount, currency) -> str:
     return f"{symbol}{text}" if symbol else f"{text} {currency}"
 
 
+def _pass_prices(t) -> list:
+    """The pass prices shown inside a cell: only when they share one duration."""
+    prices = list(t.museum_pass.prices) if t.museum_pass else []
+    if len({(p.duration_value, p.duration_unit) for p in prices}) != 1:
+        return []
+    return sorted(prices, key=lambda p: p.price, reverse=True)
+
+
+def _entry_notes(t, include_pass: bool = False) -> str:
+    """Ticket notes, plus notes of the pass prices printed in the cell.
+
+    include_pass also adds the pass's own notes; the main grid leaves them out
+    because they are shown once, next to the row's pass name.
+    """
+    parts = [t.notes]
+    if t.price == 0 and t.pass_id:   # the same case where _price_text prints them
+        parts += [p.notes for p in _pass_prices(t)]
+    if include_pass and t.museum_pass:
+        parts.append(t.museum_pass.notes)
+    return "\n".join(dict.fromkeys(p for p in parts if p))
+
+
 def _pass_price_text(t) -> str:
     """The pass's own prices ("Adult €30.00 · Young €15.00 · ..."), or "".
 
@@ -184,11 +208,7 @@ def _pass_price_text(t) -> str:
     ticket). A pass sold for 24h / 48h / 72h (Lisboa Card) is too long for a
     cell, so it returns "" and the caller falls back to "Included in pass".
     """
-    prices = list(t.museum_pass.prices) if t.museum_pass else []
-    if len({(p.duration_value, p.duration_unit) for p in prices}) != 1:
-        return ""
-    prices.sort(key=lambda p: p.price, reverse=True)
-    return " · ".join(f"{p.label} {_money(p.price, p.currency)}" for p in prices)
+    return " · ".join(f"{p.label} {_money(p.price, p.currency)}" for p in _pass_prices(t))
 
 
 def _price_text(t) -> str:
@@ -242,10 +262,14 @@ def _schedule(period: tuple, items: list, rules: list, current: list, position: 
         for ids in sets:
             entries = cells.get((key, ids))
             row_cells.append(
-                [Entry(_price_text(t), t.label) for t, _ in sorted(entries, key=lambda e: e[0].price)]
+                [Entry(_price_text(t), t.label, _entry_notes(t)) for t, _ in sorted(entries, key=lambda e: e[0].price)]
                 if entries else None
             )
-        rows.append(TicketRow(audience=audience_text(sample), cells=row_cells))
+        rows.append(TicketRow(
+            audience=audience_text(sample),
+            cells=row_cells,
+            notes=(sample.museum_pass.notes or "") if sample.museum_pass else "",
+        ))
 
     rule_rows = []
     for t, ids in rules:
@@ -255,7 +279,7 @@ def _schedule(period: tuple, items: list, rules: list, current: list, position: 
             # No period here: the selected button already says it.
             when=" · ".join(p for p in (rule_text(t), _time_window(t)) if p),
             who="" if who == "Full price" else who,
-            cells=[[Entry(_price_text(t), t.label)] if s == ids else None for s in sets],
+            cells=[[Entry(_price_text(t), t.label, _entry_notes(t, include_pass=True))] if s == ids else None for s in sets],
         ))
 
     return Schedule(

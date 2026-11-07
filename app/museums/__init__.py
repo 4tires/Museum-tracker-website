@@ -4,10 +4,11 @@ from flask import Blueprint, render_template
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db
-from app.models import Museum, MuseumPass, Ticket, Exhibition
+from app.models import Museum, MuseumPass, Ticket, Exhibition, Audioguide, GuidedVisit
 from .exhibitions import split_exhibitions, is_archived
 from .hours import build_opening_hours
 from .tickets import build_tickets
+from .visitor_info import build_audioguides, build_guided_visits, duration_text
 
 bp = Blueprint("museums", __name__)
 
@@ -35,6 +36,9 @@ def _load_museum(museum_id):
         options=[
             selectinload(Museum.exhibitions),
             selectinload(Museum.opening_hours),
+            selectinload(Museum.languages),
+            selectinload(Museum.audioguides).selectinload(Audioguide.languages),
+            selectinload(Museum.guided_visits).selectinload(GuidedVisit.exhibition),
             selectinload(Museum.tickets).selectinload(Ticket.exhibitions),
             selectinload(Museum.tickets)
             .selectinload(Ticket.museum_pass)
@@ -50,12 +54,16 @@ def museum(museum_id):
     hours = build_opening_hours(museum.opening_hours)
     exhibitions = split_exhibitions(museum.exhibitions, today)
     tickets = build_tickets(museum.tickets, museum.exhibitions, today)
+    audioguides = build_audioguides(museum.audioguides)
+    guided_visits = build_guided_visits(museum.guided_visits, today)
     return render_template(
         "museums/museum.html",
         museum=museum,
         hours=hours,
         exhibitions=exhibitions,
         tickets=tickets,
+        audioguides=audioguides,
+        guided_visits=guided_visits,
     )
 
 
@@ -70,9 +78,19 @@ def museum_archive(museum_id):
 @bp.route("/exhibitions/<int:exhibition_id>")
 def exhibition(exhibition_id):
     exhibition = db.get_or_404(Exhibition, exhibition_id)
+    today = date.today()
+    visits = db.session.execute(
+        db.select(GuidedVisit).where(GuidedVisit.exhibition_id == exhibition.id)
+    ).scalars().all()
     return render_template(
         "museums/exhibition.html",
         exhibition=exhibition,
         museum=exhibition.museum,
-        archived=is_archived(exhibition, date.today()),
+        archived=is_archived(exhibition, today),
+        duration=(
+            duration_text(exhibition.typical_duration_minutes)
+            if exhibition.typical_duration_minutes
+            else ""
+        ),
+        guided_visits=build_guided_visits(visits, today),
     )

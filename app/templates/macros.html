@@ -1,0 +1,8 @@
+{# A "?" icon that shows `text` on hover, keyboard focus or tap.
+   Renders nothing when there is no text, so callers never need an {% if %}.
+   The tooltip itself is drawn by static/notes.js (see style.css for the look). #}
+{% macro note(text) -%}
+  {%- if text and text.strip() -%}
+    <span class="note" tabindex="0" role="note" aria-label="Note: {{ text }}" data-note="{{ text }}">?</span>
+  {%- endif -%}
+{%- endmacro %}
