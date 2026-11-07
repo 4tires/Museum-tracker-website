@@ -178,7 +178,7 @@ class ExhibitionVisit(db.Model):
     user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
     exhibition_id: Mapped[int] = mapped_column(ForeignKey("exhibition.id"))
     visit_date: Mapped[date]
-    duration_minutes: Optional[int]
+    duration_minutes: Mapped[Optional[int]]
 
     # Unique rows with [user, exhibition]
     __table_args__ = (
@@ -490,7 +490,7 @@ class Language(db.Model):
 
     # Relationships
     guided_visits: Mapped[list["GuidedVisit"]] = relationship(
-        secondary=guided_visit_languages,
+        secondary="guided_visit_languages",
         back_populates="languages"
     )
 

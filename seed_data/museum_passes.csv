@@ -1,6 +1,7 @@
-﻿name;website;notes
-Lisboa Card;https://www.visitlisboa.com/en/p/lisboa-card;Includes free transportation in lisbon
-Combinado: Jerónimos, Coches e Ajuda;https://mmp.bymeoblueticket.pt/pt/event/14769/museu-nacional-dos-coches;
-Combinado: Jerónimos e Coches;https://mmp.bymeoblueticket.pt/pt/event/14769/museu-nacional-dos-coches;
-Combinado: Lisboa real;https://mmp.bymeoblueticket.pt/pt/event/14769/museu-nacional-dos-coches;
-Acesso 52;https://www.gov.pt/noticias/museus-monumentos-e-palacios-com-entrada-gratis-52-dias-por-ano;Only for Portuguese residents
+﻿name;website;notes;includes_transport
+Lisboa Card;https://www.visitlisboa.com/en/p/lisboa-card;Includes free transportation in lisbon;1
+Combinado: Jerónimos, Coches e Ajuda;https://mmp.bymeoblueticket.pt/pt/event/14769/museu-nacional-dos-coches;;0
+Combinado: Jerónimos e Coches;https://mmp.bymeoblueticket.pt/pt/event/14769/museu-nacional-dos-coches;;0
+Combinado: Lisboa real;https://mmp.bymeoblueticket.pt/pt/event/14769/museu-nacional-dos-coches;;0
+Acesso 52;https://www.gov.pt/noticias/museus-monumentos-e-palacios-com-entrada-gratis-52-dias-por-ano;Only for Portuguese residents;0
+Porto Card;https://example.com/porto-card;Fictional pass for testing. Includes free transportation in Porto;1

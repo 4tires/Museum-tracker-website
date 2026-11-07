@@ -1,0 +1,5 @@
+﻿username;first_name;last_name;email;is_admin;birth_date;is_student;resident_country;resident_municipality
+bob;Bob;Demo;bob@example.com;0;12/03/2004;1;Portugal;Lisbon
+carla;Carla;Demo;carla@example.com;0;08/11/1955;0;Portugal;Porto
+dave;Dave;Demo;dave@example.com;0;30/09/1988;0;Portugal;Lisbon
+erin;Erin;Demo;erin@example.com;1;21/07/1990;0;Belgium;Ghent

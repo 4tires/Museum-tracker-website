@@ -1,0 +1,6 @@
+﻿username;museum_name;museum_city;exhibition_name;visit_date;duration_minutes
+alice;Museu do Aljube – Resistência e Liberdade;Lisbon;Permanent exhibition;01/05/2026;75
+alice;MACAM;Lisbon;Weight-Counter-Weight;15/08/2026;45
+bob;Museu do Oriente;Lisbon;Japão: Festas e rituais;20/06/2026;90
+carla;Museu Nacional de Arte Antiga;Lisbon;Permanent exhibition;03/09/2026;120
+erin;Museu Fictício de Arte Moderna;Porto;Luz e Cor: pintura contemporânea (teste);05/10/2026;60

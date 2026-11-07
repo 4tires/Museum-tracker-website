@@ -1,9 +1,14 @@
-"""Seed script.
+"""Seed the development database from CSV fixtures.
 
-Run with:
-    python seed.py            # add seed data (skips anything that already exists)
-    python seed.py --reset    # drop and recreate all tables first, then seed
+Run from the project root:
+    python seed.py            # create missing rows; safe to re-run
+    python seed.py --reset    # drop/recreate tables, then seed everything
+
+CSV files live in ./seed_data and use semicolons as delimiters. Dates use DD/MM/YYYY.
+An optional users.csv adds extra demo accounts on top of the built-in admin/alice accounts.
+The included CSV rows are illustrative development fixtures, not authoritative museum data.
 """
+
 import sys
 import csv
 from pathlib import Path
@@ -12,76 +17,132 @@ from decimal import Decimal
 
 from werkzeug.security import generate_password_hash
 
-from app.models import (Museum, User, Exhibition, MuseumVisit, MuseumReview, MuseumWishlist, ExhibitionVisit,
-                        ExhibitionReview, ExhibitionWishlist, MuseumPass, PassPrice, Ticket, DurationUnit, Weekday,
-                        OpeningHours, Audioguide, AudioguideType, Language)
+from app.models import (
+    Museum, User, Exhibition, MuseumVisit, MuseumReview, MuseumWishlist,
+    ExhibitionVisit, ExhibitionReview, ExhibitionWishlist, MuseumPass,
+    PassPrice, Ticket, DurationUnit, Weekday, EntryPolicy, Validity,
+    OpeningHours, Audioguide, AudioguideType, Language, GuidedVisit,
+)
 from app import create_app, db
 
-# Database Logic
-def reset_db():
-    """Wipe all tables. Fine for early development with SQLite.
 
-    Note: create_all() bypasses Alembic, so the alembic_version table is not
-    touched. If you want the schema to come from migrations, delete museums.db
-    and run `flask db upgrade` instead of using --reset.
-    """
+DATA_DIR = Path(__file__).parent / "seed_data"
+PERIOD_FIELDS = ("month_from", "day_from", "month_to", "day_to")
+
+
+def reset_db():
+    """Drop and recreate all tables (intended for local development only)."""
     db.drop_all()
     db.create_all()
 
 
 def get_or_create(model, defaults=None, **lookup):
-    """Return an existing row matching `lookup`, or create it.
-    Keeps the script safe to run more than once."""
+    """Return an existing row matching lookup or create it and flush its ID."""
     instance = db.session.execute(
         db.select(model).filter_by(**lookup)
     ).scalar_one_or_none()
-    if instance:
+    if instance is not None:
         return instance
+
     instance = model(**lookup, **(defaults or {}))
     db.session.add(instance)
     db.session.flush()
     return instance
 
-# CSV Logic
-DATA_DIR = Path(__file__).parent / "seed_data"
-
-# The yearly period of a ticket (e.g. a summer price vs a winter price).
-# All four empty = year-round.
-PERIOD_FIELDS = ("month_from", "day_from", "month_to", "day_to")
 
 def read_rows(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8-sig") as f:
-        for row in csv.DictReader(f, delimiter=";"):
-            # Empty cell -> None, so nullable columns stay NULL
-            yield {k: (v.strip() or None) for k, v in row.items()}
+    """Yield clean rows from a semicolon-delimited UTF-8 CSV file."""
+    path = DATA_DIR / filename
+    if not path.exists():
+        raise FileNotFoundError(f"Seed CSV not found: {path}")
 
-def parse_bool(v):
-    return v is not None and v.lower() in {"1", "true", "yes"}
+    with path.open("r", newline="", encoding="utf-8-sig") as csv_file:
+        for line_number, row in enumerate(csv.DictReader(csv_file, delimiter=";"), start=2):
+            if not row or all(value is None or not value.strip() for value in row.values()):
+                continue
+            if None in row:
+                raise ValueError(f"Too many values in {filename}, line {line_number}.")
+            yield {key.strip(): (value.strip() or None) for key, value in row.items()}
 
-def parse_date(v):
-    return datetime.strptime(v, "%d/%m/%Y").date() if v else None
 
-def parse_int(v):
-    return int(v) if v else None
+def require(mapping, key, description):
+    try:
+        return mapping[key]
+    except KeyError as exc:
+        raise ValueError(f"Unknown {description}: {key!r}. Check the corresponding seed CSV reference.") from exc
 
-def parse_time(v):
-    return time.fromisoformat(v) if v else None
 
-def parse_decimal(v):
-    return Decimal(v.replace(",", "."))
+def parse_bool(value):
+    return value is not None and value.strip().lower() in {"1", "true", "yes", "y"}
 
-# Seed functions
+
+def parse_optional_bool(value):
+    return None if value is None else parse_bool(value)
+
+
+def parse_date(value):
+    if not value:
+        return None
+    for date_format in ("%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, date_format).date()
+        except ValueError:
+            pass
+    raise ValueError(f"Invalid date {value!r}; use DD/MM/YYYY.")
+
+
+def parse_int(value):
+    return int(value) if value is not None else None
+
+
+def parse_time(value):
+    return time.fromisoformat(value) if value else None
+
+
+def parse_decimal(value):
+    return Decimal(value.replace(",", ".")) if value is not None else None
+
+
+def parse_enum(enum_type, value):
+    if value is None:
+        return None
+    try:
+        return enum_type[value.strip()]
+    except KeyError:
+        try:
+            return enum_type(value.strip())
+        except ValueError as exc:
+            allowed = ", ".join(member.name for member in enum_type)
+            raise ValueError(f"Invalid {enum_type.__name__} value {value!r}; use one of: {allowed}.") from exc
+
+
+def parse_weekday(value):
+    """Convert a weekday label (MONDAY) or integer to the model's 0-6 value."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return Weekday[value.strip().upper()].value
+
+
 def seed_users():
-    # Development-only passwords. Never reuse these anywhere real.
+    """Create development accounts; change these credentials before any real use."""
+    shared_password_hash = generate_password_hash("change-me")
+
     admin = get_or_create(
         User,
         username="admin",
         defaults={
-            "first_name": "admin",
-            "last_name": "admin",
+            "first_name": "Admin",
+            "last_name": "Demo",
             "email": "admin@example.com",
-            "password_hash": generate_password_hash("change-me"),
+            "password_hash": shared_password_hash,
             "is_admin": True,
+            "birth_date": date(1980, 1, 1),
+            "is_student": False,
+            "resident_country": "Portugal",
+            "resident_municipality": "Lisbon",
         },
     )
     alice = get_or_create(
@@ -89,272 +150,407 @@ def seed_users():
         username="alice",
         defaults={
             "first_name": "Alice",
-            "last_name": "Ficticio",
+            "last_name": "Demo",
             "email": "alice@example.com",
-            "password_hash": generate_password_hash("change-me"),
+            "password_hash": shared_password_hash,
+            "is_admin": False,
+            "birth_date": date(1995, 6, 15),
+            "is_student": False,
+            "resident_country": "Portugal",
+            "resident_municipality": "Lisbon",
         },
     )
-    return {"admin": admin, "alice": alice}
+    users = {"admin": admin, "alice": alice}
+
+    # Optional extra demo accounts from users.csv (same shared password).
+    if (DATA_DIR / "users.csv").exists():
+        for row in read_rows("users.csv"):
+            username = row.pop("username")
+            row["is_admin"] = parse_bool(row.get("is_admin"))
+            row["is_student"] = parse_bool(row.get("is_student"))
+            row["birth_date"] = parse_date(row.get("birth_date"))
+            row["password_hash"] = shared_password_hash
+            users[username] = get_or_create(User, username=username, defaults=row)
+
+    return users
+
 
 def seed_museums():
-    result = {}
+    museums = {}
     for row in read_rows("museums.csv"):
-        name, city = row.pop("name"), row.pop("city")
-        result[(name, city)] = get_or_create(
+        name = row.pop("name")
+        city = row.pop("city")
+        row["has_lockers"] = parse_optional_bool(row.get("has_lockers"))
+        museums[(name, city)] = get_or_create(
             Museum, name=name, city=city, defaults=row
         )
-    return result
+    return museums
 
-def seed_museum_visits(users, museums):
-    # Visit has a unique (user_id, museum_id, visit_date) constraint, so look up by both.
-    museum = museums[("Museu do Aljube – Resistência e Liberdade", "Lisbon")]
 
-    get_or_create(
-        MuseumVisit,
-        user_id=users["alice"].id,
-        museum_id=museum.id,
-        visit_date=date(2026, 5, 1)
-    )
+def seed_languages():
+    languages = {}
+    for row in read_rows("languages.csv"):
+        code = row.pop("code")
+        languages[code] = get_or_create(Language, code=code, defaults=row)
+    return languages
 
-def seed_museum_wishs(users, museums):
-    # Wish has a unique (user_id, museum_id) constraint, so look up by both.
-    museum = museums[("Museu Nacional dos Coches", "Lisbon")]
-
-    get_or_create(
-        MuseumWishlist,
-        user_id=users["alice"].id,
-        museum_id=museum.id,
-    )
-
-def seed_museum_reviews(users, museums):
-    # Review has a unique (user_id, museum_id) constraint, so look up by both.
-    museum = museums[("Museu do Aljube – Resistência e Liberdade", "Lisbon")]
-
-    get_or_create(
-        MuseumReview,
-        user_id=users["alice"].id,
-        museum_id=museum.id,
-        defaults={
-            "rating": 4,
-            "review": "Great collection, go early to avoid the crowds."
-        }
-    )
 
 def seed_exhibitions(museums):
-    result = {}
+    exhibitions = {}
     for row in read_rows("exhibitions.csv"):
-        museum = museums[(row["museum_name"], row["museum_city"])]
-
-        row.pop("museum_name")
-        row.pop("museum_city")
-
+        museum_key = (row.pop("museum_name"), row.pop("museum_city"))
+        museum = require(museums, museum_key, "museum")
         name = row.pop("exhibition_name")
+        row["is_permanent"] = parse_bool(row.get("is_permanent"))
+        row["start_date"] = parse_date(row.get("start_date"))
+        row["end_date"] = parse_date(row.get("end_date"))
+        row["typical_duration_minutes"] = parse_int(row.get("typical_duration_minutes"))
 
-        row["is_permanent"] = parse_bool(row["is_permanent"])
-        row["start_date"] = parse_date(row["start_date"])
-        row["end_date"] = parse_date(row["end_date"])
-
-        result[(museum.id, name)] = get_or_create(
+        exhibitions[(museum.id, name)] = get_or_create(
             Exhibition, museum_id=museum.id, name=name, defaults=row
         )
-    return result
+    return exhibitions
 
-def seed_exhibition_visits(users, exhibitions):
-    # Visit has a unique (user_id, exhibition_id, visit_date) constraint, so look up by both.
-    get_or_create(
-        ExhibitionVisit,
-        user_id=users["alice"].id,
-        exhibition_id=1,
-        visit_date=date(2026, 5, 1)
-    )
 
-def seed_exhibition_wishs(users, exhibitions):
-    # Wish has a unique (user_id, exhibition_id) constraint, so look up by both.
-    get_or_create(
-        ExhibitionWishlist,
-        user_id=users["alice"].id,
-        exhibition_id=2,
-    )
-
-def seed_exhibition_reviews(users, exhibitions):
-    # Review has a unique (user_id, exhibition_id) constraint, so look up by both.
-    get_or_create(
-        ExhibitionReview,
-        user_id=users["alice"].id,
-        exhibition_id=1,
-        defaults={
-            "rating": 4,
-            "review": "Great collection, go early to avoid the crowds."
-        }
-    )
-
-def seed_museum_pass():
-    result = {}
+def seed_museum_passes():
+    passes = {}
     for row in read_rows("museum_passes.csv"):
         name = row.pop("name")
-        result[name] = get_or_create(
-            MuseumPass, name=name, defaults=row
-        )
-    return result
+        row["includes_transport"] = parse_bool(row.get("includes_transport"))
+        passes[name] = get_or_create(MuseumPass, name=name, defaults=row)
+    return passes
+
 
 def seed_pass_prices(museum_passes):
     for row in read_rows("pass_prices.csv"):
-        museum_pass = museum_passes[row.pop("pass_name")]
+        pass_name = row.pop("pass_name")
+        museum_pass = require(museum_passes, pass_name, "museum pass")
         label = row.pop("label")
+        duration_unit = parse_enum(DurationUnit, row.pop("duration_unit"))
+        duration_value = parse_int(row.pop("duration_value"))
 
-        row["duration_unit"] = DurationUnit[row["duration_unit"]]
-        row["duration_value"] = int(row["duration_value"])
-        row["price"] = parse_decimal(row["price"])
-        row["min_age"] = parse_int(row["min_age"])
-        row["max_age"] = parse_int(row["max_age"])
-        row["is_student"] = parse_bool(row["is_student"])
-        if not row["currency"]:
-            del row["currency"]   # let the model default ("EUR") apply
+        row["price"] = parse_decimal(row.get("price"))
+        row["min_age"] = parse_int(row.get("min_age"))
+        row["max_age"] = parse_int(row.get("max_age"))
+        row["is_student"] = parse_bool(row.get("is_student"))
+        if row.get("currency") is None:
+            row.pop("currency", None)  # use the model's EUR default
 
         get_or_create(
             PassPrice,
             pass_id=museum_pass.id,
             label=label,
+            duration_unit=duration_unit,
+            duration_value=duration_value,
             defaults=row,
         )
 
+
 def seed_tickets(museums, museum_passes):
-    # A ticket is identified by museum + label + yearly period, because the same
-    # label (e.g. "General Entry") can exist once per period (summer / winter).
-    result = {}
+    tickets = {}
     for row in read_rows("tickets.csv"):
-        museum = museums[(row["museum_name"], row["museum_city"])]
-
-        row.pop("museum_name")
-        row.pop("museum_city")
-
+        museum_key = (row.pop("museum_name"), row.pop("museum_city"))
+        museum = require(museums, museum_key, "museum")
         label = row.pop("label")
-
         pass_name = row.pop("pass_name", None)
-        row["pass_id"] = museum_passes[pass_name].id if pass_name else None
+        museum_pass = require(museum_passes, pass_name, "museum pass") if pass_name else None
 
-        row["price"] = parse_decimal(row["price"])
-        row["min_age"] = parse_int(row["min_age"])
-        row["max_age"] = parse_int(row["max_age"])
-        row["is_student"] = parse_bool(row["is_student"])
+        row["pass_id"] = museum_pass.id if museum_pass else None
+        row["price"] = parse_decimal(row.get("price"))
+        row["min_age"] = parse_int(row.get("min_age"))
+        row["max_age"] = parse_int(row.get("max_age"))
+        row["is_student"] = parse_bool(row.get("is_student"))
+        row["entry_policy"] = parse_enum(EntryPolicy, row.get("entry_policy")) or EntryPolicy.anytime
+        row["validity"] = parse_enum(Validity, row.get("validity")) or Validity.single_entry
+        row["validity_value"] = parse_int(row.get("validity_value"))
+        row["validity_unit"] = parse_enum(DurationUnit, row.get("validity_unit"))
+        row["weekday"] = parse_weekday(row.get("weekday"))
+        row["week_of_month"] = parse_int(row.get("week_of_month"))
+        row["start_time"] = parse_time(row.get("start_time"))
+        row["end_time"] = parse_time(row.get("end_time"))
+        row["month"] = parse_int(row.get("month"))
+        row["day"] = parse_int(row.get("day"))
+        row["holidays"] = parse_bool(row.get("holidays"))
 
-        row["weekday"] = Weekday[row["weekday"]] if row["weekday"] else None
-        row["week_of_month"] = parse_int(row["week_of_month"])
-        row["start_time"] = parse_time(row["start_time"])
-        row["end_time"] = parse_time(row["end_time"])
-        row["month"] = parse_int(row["month"])
-        row["day"] = parse_int(row["day"])
-        row["holidays"] = parse_bool(row["holidays"])
-
-        # The period is part of the lookup, not of the defaults.
-        period = {f: parse_int(row.pop(f)) for f in PERIOD_FIELDS}
+        period = {field: parse_int(row.pop(field)) for field in PERIOD_FIELDS}
+        if row.get("currency") is None:
+            row.pop("currency", None)
 
         ticket = get_or_create(
-            Ticket, museum_id=museum.id, label=label, **period, defaults=row
+            Ticket,
+            museum_id=museum.id,
+            label=label,
+            **period,
+            defaults=row,
         )
-        result[(museum.id, label, tuple(period.values()))] = ticket
+        tickets[(museum.id, label, tuple(period.values()))] = ticket
+    return tickets
 
-    return result
 
-def seed_ticket_exhibition(tickets, exhibitions, museums):
-    """Link tickets to the exhibitions they give access to.
-
-    A row names a ticket by museum + label. If that label exists in several
-    yearly periods, the row links all of them, unless it fills in the optional
-    month_from / day_from / month_to / day_to columns, which then link only the
-    ticket of that period.
-    """
-    by_label = {}
+def seed_ticket_exhibitions(tickets, exhibitions, museums):
+    """Link tickets to exhibitions, optionally limiting a link to a ticket's season."""
+    tickets_by_label = {}
     for (museum_id, label, period), ticket in tickets.items():
-        by_label.setdefault((museum_id, label), []).append((period, ticket))
+        tickets_by_label.setdefault((museum_id, label), []).append((period, ticket))
 
     for row in read_rows("ticket_exhibition.csv"):
-        museum = museums[(row["museum_name"], row["museum_city"])]
-        exhibition = exhibitions[(museum.id, row["exhibition_name"])]
-        wanted = tuple(parse_int(row.get(f)) for f in PERIOD_FIELDS)
-
-        for period, ticket in by_label[(museum.id, row["ticket_label"])]:
-            if wanted != (None, None, None, None) and period != wanted:
+        museum_key = (row["museum_name"], row["museum_city"])
+        museum = require(museums, museum_key, "museum")
+        exhibition_key = (museum.id, row["exhibition_name"])
+        exhibition = require(exhibitions, exhibition_key, "exhibition")
+        wanted_period = tuple(parse_int(row.get(field)) for field in PERIOD_FIELDS)
+        candidates = tickets_by_label.get((museum.id, row["ticket_label"]), [])
+        linked = 0
+        for period, ticket in candidates:
+            if wanted_period != (None, None, None, None) and period != wanted_period:
                 continue
             if exhibition not in ticket.exhibitions:
                 ticket.exhibitions.append(exhibition)
+            linked += 1
+        if not linked:
+            raise ValueError(
+                f"No ticket matched {row['ticket_label']!r} for {museum_key!r} "
+                f"and period {wanted_period!r}. Check ticket_exhibition.csv."
+            )
+
 
 def seed_opening_hours(museums):
-    result = {}
     for row in read_rows("opening_hours.csv"):
-        museum = museums[(row["museum_name"], row["museum_city"])]
+        museum_key = (row.pop("museum_name"), row.pop("museum_city"))
+        museum = require(museums, museum_key, "museum")
+        row["weekday"] = parse_weekday(row.get("weekday"))
+        for field in ("week_of_month", "month", "day", *PERIOD_FIELDS):
+            row[field] = parse_int(row.get(field))
+        for field in ("start_time", "end_time", "last_entry"):
+            row[field] = parse_time(row.get(field))
+        for field in ("holidays", "is_closed", "is_special"):
+            row[field] = parse_bool(row.get(field))
 
-        row.pop("museum_name")
-        row.pop("museum_city")
-
-        row["is_special"] = parse_bool(row["is_special"])
-        row["is_closed"] = parse_bool(row["is_closed"])
-        row["weekday"] = Weekday[row["weekday"]] if row["weekday"] else None
-        row["start_time"] = parse_time(row["start_time"])
-        row["end_time"] = parse_time(row["end_time"])
-        row["last_entry"] = parse_time(row["last_entry"])
-        row["week_of_month"] = parse_int(row["week_of_month"])
-        row["month"] = parse_int(row["month"])
-        row["day"] = parse_int(row["day"])
-        row["holidays"] = parse_bool(row["holidays"])
-        row["month_from"] = parse_int(row["month_from"])
-        row["day_from"] = parse_int(row["day_from"])
-        row["month_to"] = parse_int(row["month_to"])
-        row["day_to"] = parse_int(row["day_to"])
-
+        # OpeningHours has no declared natural-key constraint, so compare all supplied values.
         get_or_create(OpeningHours, museum_id=museum.id, **row)
 
-    return result
-def seed_languages():
-    result = {}
-    for row in read_rows("languages.csv"):
-        code = row.pop("code")
-        result[code] = get_or_create(Language, code=code, defaults=row)
-    return result
 
-def seed_audioguides(museums, languages):
-    # One row = one audioguide in one language. The audioguide is identified by
-    # museum + type (the unique constraint), so repeated rows reuse it.
+def link_once(table_name, **values):
+    """Insert a many-to-many row only when that exact pair does not exist."""
+    table = db.metadata.tables[table_name]
+    conditions = [table.c[column] == value for column, value in values.items()]
+    existing = db.session.execute(db.select(table).where(*conditions)).first()
+    if existing is None:
+        db.session.execute(table.insert().values(**values))
+
+
+def seed_museum_languages(museums, languages):
+    for row in read_rows("museum_languages.csv"):
+        museum_key = (row["museum_name"], row["museum_city"])
+        museum = require(museums, museum_key, "museum")
+        language = require(languages, row["language_code"], "language")
+        link_once("museum_language", museum_id=museum.id, language_id=language.id)
+
+
+def seed_audioguides(museums):
+    audioguides = {}
     for row in read_rows("audioguides.csv"):
-        museum = museums[(row.pop("museum_name"), row.pop("museum_city"))]
-        audioguide_type = AudioguideType[row.pop("type")]
-        language = languages[row.pop("language_code")]
-
-        row["price"] = parse_decimal(row["price"])
-        if not row["currency"]:
-            del row["currency"]   # let the model default ("EUR") apply
+        museum_key = (row.pop("museum_name"), row.pop("museum_city"))
+        museum = require(museums, museum_key, "museum")
+        audioguide_type = parse_enum(AudioguideType, row.pop("audioguide_type"))
+        row["requires_own_headphones"] = parse_bool(row.get("requires_own_headphones"))
+        row["deposit_required"] = parse_bool(row.get("deposit_required"))
+        row["price"] = parse_decimal(row.get("price"))
+        if row.get("currency") is None:
+            row.pop("currency", None)
 
         audioguide = get_or_create(
-            Audioguide, museum_id=museum.id, type=audioguide_type, defaults=row
+            Audioguide,
+            museum_id=museum.id,
+            audioguide_type=audioguide_type,
+            defaults=row,
         )
+        audioguides[(museum.id, audioguide_type)] = audioguide
+    return audioguides
+
+
+def seed_audioguide_languages(audioguides, museums, languages):
+    for row in read_rows("audioguide_languages.csv"):
+        museum_key = (row["museum_name"], row["museum_city"])
+        museum = require(museums, museum_key, "museum")
+        audioguide_type = parse_enum(AudioguideType, row["audioguide_type"])
+        audioguide = require(audioguides, (museum.id, audioguide_type), "audioguide")
+        language = require(languages, row["language_code"], "language")
         if language not in audioguide.languages:
             audioguide.languages.append(language)
+
+
+def guided_visit_key(museum_id, name, weekday, week_of_month, month, day, holidays, start_time):
+    return (museum_id, name, weekday, week_of_month, month, day, holidays, start_time)
+
+
+def seed_guided_visits(museums, exhibitions):
+    guided_visits = {}
+    for row in read_rows("guided_visits.csv"):
+        museum_key = (row.pop("museum_name"), row.pop("museum_city"))
+        museum = require(museums, museum_key, "museum")
+        exhibition_name = row.pop("exhibition_name")
+        exhibition = None
+        if exhibition_name:
+            exhibition = require(exhibitions, (museum.id, exhibition_name), "exhibition")
+        name = row.pop("name")
+
+        lookup = {
+            "museum_id": museum.id,
+            "name": name,
+            "weekday": parse_weekday(row.pop("weekday")),
+            "week_of_month": parse_int(row.pop("week_of_month")),
+            "month": parse_int(row.pop("month")),
+            "day": parse_int(row.pop("day")),
+            "holidays": parse_bool(row.pop("holidays")),
+            "start_time": parse_time(row.pop("start_time")),
+        }
+        row["exhibition_id"] = exhibition.id if exhibition else None
+        row["duration_minutes"] = parse_int(row.get("duration_minutes"))
+        row["max_participants"] = parse_int(row.get("max_participants"))
+        row["price"] = parse_decimal(row.get("price"))
+        row["end_time"] = parse_time(row.get("end_time"))
+        for field in PERIOD_FIELDS:
+            row[field] = parse_int(row.get(field))
+        row["requires_reservation"] = parse_bool(row.get("requires_reservation"))
+        if row.get("currency") is None:
+            row.pop("currency", None)
+
+        guided_visit = get_or_create(GuidedVisit, defaults=row, **lookup)
+        key = guided_visit_key(*lookup.values())
+        guided_visits[key] = guided_visit
+    return guided_visits
+
+
+def seed_guided_visit_languages(guided_visits, museums, languages):
+    for row in read_rows("guided_visit_languages.csv"):
+        museum_key = (row["museum_name"], row["museum_city"])
+        museum = require(museums, museum_key, "museum")
+        key = guided_visit_key(
+            museum.id,
+            row["guided_visit_name"],
+            parse_weekday(row.get("weekday")),
+            parse_int(row.get("week_of_month")),
+            parse_int(row.get("month")),
+            parse_int(row.get("day")),
+            parse_bool(row.get("holidays")),
+            parse_time(row.get("start_time")),
+        )
+        guided_visit = require(guided_visits, key, "guided visit")
+        language = require(languages, row["language_code"], "language")
+        if language not in guided_visit.languages:
+            guided_visit.languages.append(language)
+
+
+def seed_museum_visits(users, museums):
+    for row in read_rows("museum_visits.csv"):
+        user = require(users, row["username"], "user")
+        museum = require(museums, (row["museum_name"], row["museum_city"]), "museum")
+        get_or_create(
+            MuseumVisit,
+            user_id=user.id,
+            museum_id=museum.id,
+            visit_date=parse_date(row["visit_date"]),
+        )
+
+
+def seed_museum_wishlists(users, museums):
+    for row in read_rows("museum_wishlist.csv"):
+        user = require(users, row["username"], "user")
+        museum = require(museums, (row["museum_name"], row["museum_city"]), "museum")
+        get_or_create(MuseumWishlist, user_id=user.id, museum_id=museum.id)
+
+
+def seed_museum_reviews(users, museums):
+    for row in read_rows("museum_reviews.csv"):
+        user = require(users, row["username"], "user")
+        museum = require(museums, (row["museum_name"], row["museum_city"]), "museum")
+        get_or_create(
+            MuseumReview,
+            user_id=user.id,
+            museum_id=museum.id,
+            defaults={"rating": parse_int(row.get("rating")), "review": row.get("review")},
+        )
+
+
+def seed_exhibition_visits(users, museums, exhibitions):
+    for row in read_rows("exhibition_visits.csv"):
+        user = require(users, row["username"], "user")
+        museum = require(museums, (row["museum_name"], row["museum_city"]), "museum")
+        exhibition = require(exhibitions, (museum.id, row["exhibition_name"]), "exhibition")
+        get_or_create(
+            ExhibitionVisit,
+            user_id=user.id,
+            exhibition_id=exhibition.id,
+            visit_date=parse_date(row["visit_date"]),
+            defaults={"duration_minutes": parse_int(row.get("duration_minutes"))},
+        )
+
+
+def seed_exhibition_wishlists(users, museums, exhibitions):
+    for row in read_rows("exhibition_wishlist.csv"):
+        user = require(users, row["username"], "user")
+        museum = require(museums, (row["museum_name"], row["museum_city"]), "museum")
+        exhibition = require(exhibitions, (museum.id, row["exhibition_name"]), "exhibition")
+        get_or_create(ExhibitionWishlist, user_id=user.id, exhibition_id=exhibition.id)
+
+
+def seed_exhibition_reviews(users, museums, exhibitions):
+    for row in read_rows("exhibition_reviews.csv"):
+        user = require(users, row["username"], "user")
+        museum = require(museums, (row["museum_name"], row["museum_city"]), "museum")
+        exhibition = require(exhibitions, (museum.id, row["exhibition_name"]), "exhibition")
+        get_or_create(
+            ExhibitionReview,
+            user_id=user.id,
+            exhibition_id=exhibition.id,
+            defaults={"rating": parse_int(row.get("rating")), "review": row.get("review")},
+        )
+
 
 def main():
     app = create_app()
     with app.app_context():
-        if "--reset" in sys.argv:
-            reset_db()
+        try:
+            if "--reset" in sys.argv:
+                reset_db()
+            else:
+                db.create_all()
 
-        users = seed_users()
-        museums = seed_museums()
-        languages = seed_languages()
-        exhibitions = seed_exhibitions(museums)
-        museum_passes = seed_museum_pass()
-        tickets = seed_tickets(museums, museum_passes)
-        seed_museum_visits(users, museums)
-        seed_museum_wishs(users, museums)
-        seed_museum_reviews(users, museums)
-        seed_exhibition_visits(users, exhibitions)
-        seed_exhibition_wishs(users, exhibitions)
-        seed_exhibition_reviews(users, exhibitions)
-        seed_pass_prices(museum_passes)
-        seed_ticket_exhibition(tickets, exhibitions, museums)
-        seed_opening_hours(museums)
-        seed_audioguides(museums, languages)
+            # Parent rows first: users, museums, languages, exhibitions and passes.
+            users = seed_users()
+            museums = seed_museums()
+            languages = seed_languages()
+            exhibitions = seed_exhibitions(museums)
+            museum_passes = seed_museum_passes()
 
-        db.session.commit()
-        print("Seeding done.")
+            # Dependent ticket/pass data.
+            seed_pass_prices(museum_passes)
+            tickets = seed_tickets(museums, museum_passes)
+            seed_ticket_exhibitions(tickets, exhibitions, museums)
+
+            # Museum facilities and many-to-many relationships.
+            seed_opening_hours(museums)
+            seed_museum_languages(museums, languages)
+            audioguides = seed_audioguides(museums)
+            seed_audioguide_languages(audioguides, museums, languages)
+            guided_visits = seed_guided_visits(museums, exhibitions)
+            seed_guided_visit_languages(guided_visits, museums, languages)
+
+            # User activity comes last because it references users and catalogue rows.
+            seed_museum_visits(users, museums)
+            seed_museum_wishlists(users, museums)
+            seed_museum_reviews(users, museums)
+            seed_exhibition_visits(users, museums, exhibitions)
+            seed_exhibition_wishlists(users, museums, exhibitions)
+            seed_exhibition_reviews(users, museums, exhibitions)
+
+            db.session.commit()
+            print("Seeding done.")
+        except Exception:
+            db.session.rollback()
+            raise
+
 
 if __name__ == "__main__":
     main()

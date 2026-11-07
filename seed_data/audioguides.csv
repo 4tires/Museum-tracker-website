@@ -1,6 +1,9 @@
-﻿museum_name;museum_city;type;price;currency;notes;language_code
-Museu do Oriente;Lisbon;smartphone_app;0;EUR;;pt
-Museu do Oriente;Lisbon;smartphone_app;0;EUR;;en
-MACAM;Lisbon;physical_device;3,5;EUR;;pt
-MACAM;Lisbon;physical_device;3,5;EUR;;en
-MACAM;Lisbon;physical_device;3,5;EUR;;fr
+﻿museum_name;museum_city;audioguide_type;price;currency;requires_own_headphones;deposit_required;notes
+Museu do Aljube – Resistência e Liberdade;Lisbon;physical_device;3;EUR;1;1;Bring your own headphones, device loaned at the desk
+Museu Nacional dos Coches;Lisbon;physical_device;5;EUR;0;1;ID required as deposit
+Museu Nacional de Arte Antiga;Lisbon;physical_device;2,5;EUR;1;0;
+Museu do Oriente;Lisbon;smartphone_app;0;EUR;0;0;Free app, bring headphones
+Museu do Oriente;Lisbon;physical_device;2;EUR;1;1;
+MACAM;Lisbon;physical_device;3,5;EUR;0;0;
+Museu Fictício de Arte Moderna;Porto;smartphone_app;0;EUR;0;0;Demo app for testing
+Museu Nacional de Arte Antiga;Lisbon;web_qr;0;EUR;1;0;Scan a QR code at the entrance
