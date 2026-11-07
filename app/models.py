@@ -75,6 +75,9 @@ class Museum(db.Model):
     audioguides: Mapped[list["Audioguide"]] = relationship(
         back_populates="museum", cascade="all, delete-orphan"
     )
+    guided_visits: Mapped[list["GuidedVisit"]] = relationship(
+        back_populates="museum", cascade="all, delete-orphan"
+    )
 
 class MuseumVisit(db.Model):
     __tablename__ = "museum_visits"
@@ -153,13 +156,13 @@ class Exhibition(db.Model):
 
     # Constraints
     __table_args__ = (
-        UniqueConstraint("museum_id", "name", name="uq_exhibition_museum_name")
+        UniqueConstraint("museum_id", "name", name="uq_exhibition_museum_name"),
         CheckConstraint(
             "start_date IS NULL OR end_date IS NULL OR start_date <= end_date",
             name="ck_exhibition_date_range",
         ),
         CheckConstraint("NOT is_permanent OR end_date IS NULL", name="ck_permanent_wth_date"),
-        CheckConstraint("duration_minutes > 0", name="ck_visit_duration_nonneg")
+        CheckConstraint("typical_duration_minutes > 0", name="ck_visit_duration_nonneg"),
     )
 
     # Relationships
@@ -346,7 +349,7 @@ class Ticket(AudienceConditionsMixin, ScheduleConditionsMixin, db.Model):
     pass_id: Mapped[Optional[int]] = mapped_column(ForeignKey("passes.id", ondelete="RESTRICT"))
     entry_policy: Mapped[EntryPolicy] = mapped_column(
         Enum(EntryPolicy, native_enum=False, create_constraint=True, name="entry_policy"),
-        default=EntryPolicy.ANYTIME
+        default=EntryPolicy.anytime
     )
     validity: Mapped[Validity] = mapped_column(
         Enum(Validity, native_enum=False, create_constraint=True, name="validity"),
@@ -605,7 +608,7 @@ class GuidedVisit(ScheduleConditionsMixin, db.Model):
     museum: Mapped["Museum"] = relationship(back_populates="guided_visits")
     exhibition: Mapped[Optional["Exhibition"]] = relationship()
     languages: Mapped[list["Language"]] = relationship(
-        secondary=guided_visit_languages,
+        secondary="guided_visit_languages",
         back_populates="guided_visits",
         lazy="selectin"
     )
