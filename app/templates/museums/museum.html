@@ -187,6 +187,17 @@
         <p class="muted">No ticket information yet.</p>
       {% endif %}
 
+      {% if tickets.has_norm %}
+        <div class="ticket-norm">
+          <p class="ticket-norm-title">Standard ticket</p>
+          <dl>
+            <dt>Validity</dt>
+            <dd>{{ tickets.norm_validity }}</dd>
+            <dt>Entry</dt>
+            <dd>{{ tickets.norm_entry }}</dd>
+          </dl>        </div>
+      {% endif %}
+
       {% if tickets.schedules %}
         {% set multi = tickets.schedules | length > 1 %}
 
@@ -213,6 +224,7 @@
                     {% for c in s.columns %}
                       <th scope="col">
                         {{ c.title }}
+                        {% if c.badge %}<br><span class="muted">{{ c.badge }}</span>{% endif %}
                       </th>
                     {% endfor %}
                   </tr>
@@ -220,14 +232,21 @@
                 <tbody>
                   {% for row in s.rows %}
                     <tr>
-                      <th scope="row">{{ row.audience }}</th>
+                      <th scope="row">
+                        {{ row.audience }}
+                        {% if row.badge %}<br><span class="muted">{{ row.badge }}</span>{% endif %}
+                      </th>
                       {% for cell in row.cells %}
                         {% if cell is none %}
                           <td class="muted">—</td>
                         {% else %}
                           <td>
+                            {# Normally one price per cell. Several only happens when two tickets
+                               share audience, validity and exhibitions: then each shows its label. #}
                             {% for entry in cell %}
-                              {{ entry.price }}{% if cell | length > 1 %} <span class="muted">({{ entry.label }})</span>{% endif %}{% if not loop.last %}<br>{% endif %}
+                              {{ entry.price }}{% if cell | length > 1 %} <span class="muted">({{ entry.label }})</span>{% endif %}
+                              {% if entry.badge %}<br><span class="muted">{{ entry.badge }}</span>{% endif %}
+                              {% if not loop.last %}<br>{% endif %}
                             {% endfor %}
                           </td>
                         {% endif %}
@@ -244,12 +263,13 @@
                         <th scope="row">
                           {{ r.label }}<br>
                           <span class="muted">{{ r.when }}{% if r.who %} · {{ r.who }}{% endif %}</span>
+                          {% if r.badge %}<br><span class="muted">{{ r.badge }}</span>{% endif %}
                         </th>
                         {% for cell in r.cells %}
                           {% if cell is none %}
                             <td class="muted">—</td>
                           {% else %}
-                            <td>{% for entry in cell %}{{ entry.price }}{{ note(entry.notes) }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+                            <td>{% for entry in cell %}{{ entry.price }}{{ note(entry.notes) }}{% if entry.badge %}<br><span class="muted">{{ entry.badge }}</span>{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
                           {% endif %}
                         {% endfor %}
                       </tr>
