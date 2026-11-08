@@ -1,13 +1,25 @@
 from sqlalchemy import String, Text, ForeignKey, UniqueConstraint, CheckConstraint, Numeric, Table, Column, Enum, Integer, Time, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from flask_login import UserMixin
+from flask_security import UserMixin, RoleMixin
 
-from .extensions import db, login_manager
+from .extensions import db
 
 from datetime import datetime, date, timezone, time
 from decimal import Decimal
 from typing import Optional
 import enum
+
+roles_users = Table(
+    "roles_users", db.metadata,
+    Column("user_id", ForeignKey("user_account.id"), primary_key=True),
+    Column("role_id", ForeignKey("role.id"), primary_key=True),
+)
+
+class Role(RoleMixin, db.Model):
+    __tablename__ = "role"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    description: Mapped[Optional[str]] = mapped_column(String(255))
 
 class User(UserMixin, db.Model):
     __tablename__ = "user_account"
@@ -17,12 +29,17 @@ class User(UserMixin, db.Model):
     first_name: Mapped[str] = mapped_column(String(50))
     last_name: Mapped[str] = mapped_column(String(50))
     email: Mapped[str] = mapped_column(String(254), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
-    is_admin: Mapped[bool] = mapped_column(default=False)
+    password: Mapped[str] = mapped_column(String(255))
     birth_date: Mapped[date]
     is_student: Mapped[bool] = mapped_column(default=False)
     resident_country: Mapped[str] = mapped_column(String(50))
     resident_municipality: Mapped[str] = mapped_column(String(50))
+
+    # Flask Security
+    active: Mapped[bool] = mapped_column(default=True)
+    fs_uniquifier: Mapped[str] = mapped_column(String(64), unique=True)
+    roles: Mapped[list["Role"]] = relationship(secondary=roles_users, backref="users")
+
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc)
     )
@@ -624,8 +641,3 @@ guided_visit_languages = Table(
     Column("guided_visit_id", ForeignKey("guided_visits.id", ondelete="CASCADE"), primary_key=True),
     Column("language_id", ForeignKey("languages.id", ondelete="CASCADE"), primary_key=True),
 )
-
-
-@login_manager.user_loader
-def load_user(user_id):
-    return db.session.get(User, int(user_id))

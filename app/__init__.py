@@ -4,7 +4,7 @@ from sqlalchemy.engine import Engine
 
 from config import Config
 
-from .extensions import csrf, db, login_manager, migrate
+from .extensions import csrf, db, migrate, security
 
 
 @event.listens_for(Engine, "connect")
@@ -23,14 +23,17 @@ def create_app(config_class=Config):
 
     db.init_app(app)
     migrate.init_app(app, db)
-    login_manager.init_app(app)
     csrf.init_app(app)
 
     # Import models so Flask-Migrate can see them.
     from . import models  # noqa: F401
     from .museums import bp as museums_bp
     from .admin import admin
-
+    from flask_security import SQLAlchemyUserDatastore
+    from .auth.forms import ExtendedRegisterForm
+    
+    user_datastore = SQLAlchemyUserDatastore(db, models.User, models.Role)
+    security.init_app(app, user_datastore, register_form=ExtendedRegisterForm)
     admin.init_app(app)
 
     app.register_blueprint(museums_bp)

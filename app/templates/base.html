@@ -7,10 +7,21 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <header>
+    <header>
     <a href="{{ url_for('museums.index') }}">Home</a>
     <a href="{{ url_for('museums.museums') }}">Museums</a>
-    {# TODO: nav links, login/logout depending on current_user #}
+    {% if current_user.is_authenticated %}
+      {% if current_user.has_role('admin') %}
+        <a href="{{ url_for('admin.index') }}">Admin</a>
+      {% endif %}
+      <form action="{{ url_for('security.logout') }}" method="post" class="logout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">Logout</button>
+      </form>
+    {% else %}
+      <a href="{{ url_for('security.login') }}">Login</a>
+      <a href="{{ url_for('security.register') }}">Register</a>
+    {% endif %}
   </header>
 
   <main>

@@ -4,9 +4,9 @@ from flask_admin.contrib.sqla import ModelView
 from flask_admin.model.template import EndpointLinkRowAction
 from flask_admin.theme import Bootstrap4Theme
 from flask_login import current_user
+from flask_security import hash_password
 from flask_wtf import FlaskForm
 from markupsafe import Markup
-from werkzeug.security import generate_password_hash
 from wtforms import PasswordField
 
 from .. import models
@@ -14,14 +14,12 @@ from ..extensions import db
 
 
 class AdminAccessMixin:
-    """Only logged-in admins may see anything under the admin."""
-
     def is_accessible(self):
-        return current_user.is_authenticated and current_user.is_admin
+        return current_user.is_active and current_user.is_authenticated and current_user.has_role("admin")
 
     def inaccessible_callback(self, name, **kwargs):
         if not current_user.is_authenticated:
-            return redirect(url_for("auth.login", next=request.url))
+            return redirect(url_for("security.login", next=request.url))
         abort(403)
 
 
@@ -52,19 +50,17 @@ class BaseView(AdminAccessMixin, ModelView):
 
 
 class UserView(BaseView):
-    column_exclude_list = ("password_hash",)
-    column_searchable_list = ("username", "email")
-    # Visits/wishlists/reviews are the users' own data, not edited from here.
+    column_exclude_list = ("password", "fs_uniquifier")
     form_excluded_columns = (
-        "password_hash", "created_at",
+        "password", "fs_uniquifier", "created_at",
         "museum_visits", "museum_wishlist", "museum_reviews",
         "exhibition_visits", "exhibition_wishlist", "exhibition_reviews",
     )
-    form_extra_fields = {"password": PasswordField("New password")}
+    form_extra_fields = {"new_password": PasswordField("New password")}
 
     def on_model_change(self, form, model, is_created):
-        if form.password.data:
-            model.password_hash = generate_password_hash(form.password.data)
+        if form.new_password.data:
+            model.password = hash_password(form.new_password.data)
         elif is_created:
             raise ValueError("A password is required for new users.")
 
@@ -88,6 +84,12 @@ class MuseumView(BaseView):
     ]
 
 
+class RoleView(BaseView):
+    column_searchable_list = ("name",)
+    # Exclude the backref to users to avoid loading all users in a multi-select.
+    form_excluded_columns = ("users",)
+
+
 admin = Admin(
     name="Administration",
     theme=Bootstrap4Theme(swatch="lux"),
@@ -96,3 +98,4 @@ admin = Admin(
 
 admin.add_view(UserView(models.User, db.session))
 admin.add_view(MuseumView(models.Museum, db.session))
+admin.add_view(RoleView(models.Role, db.session))

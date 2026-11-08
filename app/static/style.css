@@ -109,3 +109,70 @@ body {
 }
 .ticket-norm dt { font-weight: 600; }
 .ticket-norm dd { margin: 0; }
+
+/* ---------- Login and register ---------- */
+.auth-card {
+  max-width: 24rem;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+.auth-card h1 { margin-top: 0; font-size: 1.5rem; }
+
+.auth-form { display: grid; gap: 1rem; }
+.auth-form .fs-div { display: grid; gap: 0.3rem; }
+.auth-form label { font-weight: 600; font-size: 0.9rem; }
+
+/* text, email, password, date */
+.auth-form input:not([type="checkbox"]):not([type="submit"]):not([type="hidden"]) {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 0.4rem;
+  background: #fff;
+}
+.auth-form input:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 1px;
+  border-color: #4a90d9;
+}
+
+/* Checkboxes (is_student, remember): box and label on one line */
+.auth-form .fs-div:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.auth-form .fs-div:has(input[type="checkbox"]) label { font-weight: 400; }
+
+/* Errors */
+.auth-form .flash { color: #b3261e; margin: 0; }
+.auth-form .fs-error-list { list-style: none; margin: 0; padding: 0; }
+.auth-form .fs-error-msg { color: #b3261e; font-size: 0.85rem; }
+.auth-form .fs-div:has(.fs-error-msg) input { border-color: #b3261e; }
+
+/* Submit */
+.auth-form input[type="submit"] {
+  font: inherit;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #222;
+  border-radius: 0.4rem;
+  background: #222;
+  color: #fff;
+  cursor: pointer;
+}
+.auth-form input[type="submit"]:hover { background: #000; }
+.auth-form input[type="submit"]:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 2px;
+}
+
+.auth-alt { margin: 1rem 0 0; text-align: center; font-size: 0.9rem; color: #666; }
+
+@media (max-width: 600px) {
+  .auth-card { margin: 1rem 0; padding: 0; border: none; }
+}

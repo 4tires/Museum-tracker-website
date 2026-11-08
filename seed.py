@@ -15,13 +15,15 @@ from pathlib import Path
 from datetime import date, time, datetime
 from decimal import Decimal
 
-from werkzeug.security import generate_password_hash
+import uuid
+from flask_security import hash_password
 
 from app.models import (
     Museum, User, Exhibition, MuseumVisit, MuseumReview, MuseumWishlist,
     ExhibitionVisit, ExhibitionReview, ExhibitionWishlist, MuseumPass,
     PassPrice, Ticket, DurationUnit, Weekday, EntryPolicy, Validity,
     OpeningHours, Audioguide, AudioguideType, Language, GuidedVisit,
+    Role,
 )
 from app import create_app, db
 
@@ -125,52 +127,42 @@ def parse_weekday(value):
     except ValueError:
         return Weekday[value.strip().upper()].value
 
+USER_COLUMNS = (
+    "username", "first_name", "last_name", "email", "is_admin",
+    "birth_date", "is_student", "resident_country", "resident_municipality",
+)
 
 def seed_users():
-    """Create development accounts; change these credentials before any real use."""
-    shared_password_hash = generate_password_hash("change-me")
+    """Create development accounts from users.csv; change these credentials before any real use."""
+    shared_password_hash = hash_password("change-me")
 
-    admin = get_or_create(
-        User,
-        username="admin",
-        defaults={
-            "first_name": "Admin",
-            "last_name": "Demo",
-            "email": "admin@example.com",
-            "password_hash": shared_password_hash,
-            "is_admin": True,
-            "birth_date": date(1980, 1, 1),
-            "is_student": False,
-            "resident_country": "Portugal",
-            "resident_municipality": "Lisbon",
-        },
-    )
-    alice = get_or_create(
-        User,
-        username="alice",
-        defaults={
-            "first_name": "Alice",
-            "last_name": "Demo",
-            "email": "alice@example.com",
-            "password_hash": shared_password_hash,
-            "is_admin": False,
-            "birth_date": date(1995, 6, 15),
-            "is_student": False,
-            "resident_country": "Portugal",
-            "resident_municipality": "Lisbon",
-        },
-    )
-    users = {"admin": admin, "alice": alice}
+    roles = {
+        "admin": get_or_create(Role, name="admin", defaults={"description": "Administrator"}),
+        "user": get_or_create(Role, name="user", defaults={"description": "Regular user"}),
+    }
 
-    # Optional extra demo accounts from users.csv (same shared password).
-    if (DATA_DIR / "users.csv").exists():
-        for row in read_rows("users.csv"):
-            username = row.pop("username")
-            row["is_admin"] = parse_bool(row.get("is_admin"))
-            row["is_student"] = parse_bool(row.get("is_student"))
-            row["birth_date"] = parse_date(row.get("birth_date"))
-            row["password_hash"] = shared_password_hash
-            users[username] = get_or_create(User, username=username, defaults=row)
+    users = {}
+    for row in read_rows("users.csv"):
+        missing = [c for c in USER_COLUMNS if c not in row]
+        if missing:
+            raise ValueError(f"users.csv is missing columns: {', '.join(missing)}")
+
+        username = row.pop("username")
+        is_admin = parse_bool(row.pop("is_admin"))
+        row["is_student"] = parse_bool(row.get("is_student"))
+        row["birth_date"] = parse_date(row.get("birth_date"))
+        row["password"] = shared_password_hash
+        row["fs_uniquifier"] = uuid.uuid4().hex
+
+        user = get_or_create(User, username=username, defaults=row)
+        if not user.fs_uniquifier:  # row created before the Flask-Security migration
+            user.fs_uniquifier = uuid.uuid4().hex
+
+        role = roles["admin" if is_admin else "user"]
+        if role not in user.roles:
+            user.roles.append(role)
+
+        users[username] = user
 
     return users
 

@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: c5699b22c02e
+Revision ID: ca00a25547ef
 Revises: 
-Create Date: 2026-11-07 10:37:08.127611
+Create Date: 2026-11-08 11:42:12.913939
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'c5699b22c02e'
+revision = 'ca00a25547ef'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -51,21 +51,30 @@ def upgrade():
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
+    op.create_table('role',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(length=80), nullable=False),
+    sa.Column('description', sa.String(length=255), nullable=True),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name')
+    )
     op.create_table('user_account',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('username', sa.String(length=50), nullable=False),
     sa.Column('first_name', sa.String(length=50), nullable=False),
     sa.Column('last_name', sa.String(length=50), nullable=False),
     sa.Column('email', sa.String(length=254), nullable=False),
-    sa.Column('password_hash', sa.String(length=255), nullable=False),
-    sa.Column('is_admin', sa.Boolean(), nullable=False),
+    sa.Column('password', sa.String(length=255), nullable=False),
     sa.Column('birth_date', sa.Date(), nullable=False),
     sa.Column('is_student', sa.Boolean(), nullable=False),
     sa.Column('resident_country', sa.String(length=50), nullable=False),
     sa.Column('resident_municipality', sa.String(length=50), nullable=False),
+    sa.Column('active', sa.Boolean(), nullable=False),
+    sa.Column('fs_uniquifier', sa.String(length=64), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email'),
+    sa.UniqueConstraint('fs_uniquifier'),
     sa.UniqueConstraint('username')
     )
     op.create_table('audioguides',
@@ -197,6 +206,13 @@ def upgrade():
     sa.ForeignKeyConstraint(['pass_id'], ['passes.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('pass_id', 'label', 'duration_value', 'duration_unit', name='uq_pass_price_label')
+    )
+    op.create_table('roles_users',
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('role_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['role_id'], ['role.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['user_account.id'], ),
+    sa.PrimaryKeyConstraint('user_id', 'role_id')
     )
     op.create_table('tickets',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -362,6 +378,7 @@ def downgrade():
         batch_op.drop_index('uq_ticket_museum_label_year_round', sqlite_where=sa.text('month_from IS NULL'), postgresql_where=sa.text('month_from IS NULL'))
 
     op.drop_table('tickets')
+    op.drop_table('roles_users')
     op.drop_table('pass_prices')
     op.drop_table('opening_hours')
     op.drop_table('museum_wishlist')
@@ -371,6 +388,7 @@ def downgrade():
     op.drop_table('exhibition')
     op.drop_table('audioguides')
     op.drop_table('user_account')
+    op.drop_table('role')
     op.drop_table('passes')
     op.drop_table('museum')
     op.drop_table('languages')

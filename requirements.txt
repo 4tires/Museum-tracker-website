@@ -6,3 +6,7 @@ Flask-WTF
 email-validator
 python-dotenv
 pytest
+nh3
+Flask-Security-Too
+Flask-Admin
+argon2-cffi
