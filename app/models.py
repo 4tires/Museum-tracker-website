@@ -21,6 +21,12 @@ class Role(RoleMixin, db.Model):
     name: Mapped[str] = mapped_column(String(80), unique=True)
     description: Mapped[Optional[str]] = mapped_column(String(255))
 
+    def __repr__(self) -> str:
+        return f"Role(id={self.id!r}, name={self.name!r})"
+    
+    def __str__(self) -> str:
+        return f"{self.name}"
+
 class User(UserMixin, db.Model):
     __tablename__ = "user_account"
 
@@ -46,6 +52,9 @@ class User(UserMixin, db.Model):
 
     def __repr__(self) -> str:
         return f"User(id={self.id!r}, username={self.username!r})"
+
+    def __str__(self) -> str:
+        return f"{self.username}"
 
 # Museum tables
 class Museum(db.Model):
@@ -98,6 +107,12 @@ class Museum(db.Model):
     # Languages of the museum's display texts (uses the museum_language table below)
     languages: Mapped[list["Language"]] = relationship(secondary="museum_language")
 
+    def __repr__(self) -> str:
+        return f"Museum(id={self.id!r}, name={self.name!r}, city={self.city!r})"
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.city})"
+
 class MuseumVisit(db.Model):
     __tablename__ = "museum_visits"
 
@@ -115,6 +130,12 @@ class MuseumVisit(db.Model):
     user: Mapped["User"] = relationship(backref="museum_visits")
     museum: Mapped["Museum"] = relationship(backref="museum_visits")
 
+    def __repr__(self) -> str:
+        return f"MuseumVisit(id={self.id!r}, user_id={self.user_id!r}, museum_id={self.museum_id!r}, visit_date={self.visit_date!r})"
+
+    def __str__(self) -> str:
+        return f"{self.user} - {self.museum} ({self.visit_date})"
+
 class MuseumWishlist(db.Model):
     __tablename__ = "museum_wishlist"
 
@@ -130,6 +151,12 @@ class MuseumWishlist(db.Model):
     # Relationships
     user: Mapped["User"] = relationship(backref="museum_wishlist")
     museum: Mapped["Museum"] = relationship(backref="museum_wishlist")
+
+    def __repr__(self) -> str:
+        return f"MuseumWishlist(id={self.id!r}, user_id={self.user_id!r}, museum_id={self.museum_id!r})"
+
+    def __str__(self) -> str:
+        return f"{self.user} - {self.museum}"
 
 class MuseumReview(db.Model):
     __tablename__ = "museum_reviews"
@@ -156,6 +183,13 @@ class MuseumReview(db.Model):
     # Relationships
     user: Mapped["User"] = relationship(backref="museum_reviews")
     museum: Mapped["Museum"] = relationship(backref="museum_reviews")
+
+    def __repr__(self) -> str:
+        return f"MuseumReview(id={self.id!r}, user_id={self.user_id!r}, museum_id={self.museum_id!r})"
+
+    def __str__(self) -> str:
+        rating_str = f" ({self.rating}/10)" if self.rating else ""
+        return f"{self.user} - {self.museum}{rating_str}"
 
 # Exhibition tables
 class Exhibition(db.Model):
@@ -190,6 +224,12 @@ class Exhibition(db.Model):
         secondary="ticket_exhibition", back_populates="exhibitions"
     )
 
+    def __repr__(self) -> str:
+        return f"Exhibition(id={self.id!r}, name={self.name!r}, museum_id={self.museum_id!r})"
+
+    def __str__(self) -> str:
+        return f"{self.name}"
+
 class ExhibitionVisit(db.Model):
     __tablename__ = "exhibition_visits"
 
@@ -209,6 +249,12 @@ class ExhibitionVisit(db.Model):
     user: Mapped["User"] = relationship(backref="exhibition_visits")
     exhibition: Mapped["Exhibition"] = relationship(backref="exhibition_visits")
 
+    def __repr__(self) -> str:
+        return f"ExhibitionVisit(id={self.id!r}, user_id={self.user_id!r}, exhibition_id={self.exhibition_id!r}, visit_date={self.visit_date!r})"
+
+    def __str__(self) -> str:
+        return f"{self.user} - {self.exhibition} ({self.visit_date})"
+
 class ExhibitionWishlist(db.Model):
     __tablename__ = "exhibition_wishlist"
 
@@ -224,6 +270,12 @@ class ExhibitionWishlist(db.Model):
     # Relationships
     user: Mapped["User"] = relationship(backref="exhibition_wishlist")
     exhibition: Mapped["Exhibition"] = relationship(backref="exhibition_wishlist")
+
+    def __repr__(self) -> str:
+        return f"ExhibitionWishlist(id={self.id!r}, user_id={self.user_id!r}, exhibition_id={self.exhibition_id!r})"
+
+    def __str__(self) -> str:
+        return f"{self.user} - {self.exhibition}"
 
 class ExhibitionReview(db.Model):
     __tablename__ = "exhibition_reviews"
@@ -251,13 +303,20 @@ class ExhibitionReview(db.Model):
     user: Mapped["User"] = relationship(backref="exhibition_reviews")
     exhibition: Mapped["Exhibition"] = relationship(backref="exhibition_reviews")
 
+    def __repr__(self) -> str:
+        return f"ExhibitionReview(id={self.id!r}, user_id={self.user_id!r}, exhibition_id={self.exhibition_id!r})"
+
+    def __str__(self) -> str:
+        rating_str = f" ({self.rating}/10)" if self.rating else ""
+        return f"{self.user} - {self.exhibition}{rating_str}"
+
 class MuseumPass(db.Model):
     __tablename__ = "passes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    includes_transport: Mapped[bool] = mapped_column(default=False)
     name: Mapped[str] = mapped_column(String(100), unique=True) # Include period in the name (e.g. "24h", "48h", "72h", "Year")
     website: Mapped[Optional[str]] = mapped_column(String(254))
+    includes_transport: Mapped[bool] = mapped_column(default=False)
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
     # Relationships
@@ -269,9 +328,11 @@ class MuseumPass(db.Model):
         back_populates="museum_pass", passive_deletes="all"
     )
 
-    # Repr
     def __repr__(self) -> str:
-        return f"Pass(id={self.id!r}, name={self.name!r})"
+        return f"MuseumPass(id={self.id!r}, name={self.name!r})"
+
+    def __str__(self) -> str:
+        return f"{self.name}"
 
 # Share conditions between class Ticket and class Pass Price
 class AudienceConditionsMixin:
@@ -301,6 +362,7 @@ class PassPrice(AudienceConditionsMixin, db.Model):
     currency: Mapped[str] = mapped_column(String(3), default="EUR")
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
+    # Constraints
     __table_args__ = (
         CheckConstraint("price >= 0", name="ck_pass_price_nonneg"),
         CheckConstraint(
@@ -312,7 +374,14 @@ class PassPrice(AudienceConditionsMixin, db.Model):
         UniqueConstraint("pass_id", "label", "duration_value", "duration_unit", name="uq_pass_price_label"),
     )
 
+    #Relationships
     museum_pass: Mapped["MuseumPass"] = relationship(back_populates="prices")
+
+    def __repr__(self) -> str:
+        return f"PassPrice(id={self.id!r}, label={self.label!r})"
+
+    def __str__(self) -> str:
+        return f"{self.label}"
 
 class Weekday(enum.IntEnum):
     MONDAY = 0
@@ -449,6 +518,11 @@ class Ticket(AudienceConditionsMixin, ScheduleConditionsMixin, db.Model):
         secondary="ticket_exhibition", back_populates="tickets"
     )
 
+    def __repr__(self) -> str:
+        return f"Ticket(id={self.id!r}, museum_id={self.museum_id!r}, label={self.label!r})"
+    def __str__(self) -> str:
+        return f"{self.label}"
+
 # Middle table: which exhibitions a ticket gives access to.
 ticket_exhibition = Table(
     "ticket_exhibition",
@@ -501,6 +575,16 @@ class OpeningHours(ScheduleConditionsMixin, db.Model):
     # Relationships
     museum: Mapped["Museum"] = relationship(back_populates="opening_hours")
 
+    def __repr__(self) -> str:
+        return f"OpeningHours(id={self.id!r}, museum_id={self.museum_id!r})"
+
+    def __str__(self) -> str:
+        if self.label:
+            return self.label
+        if self.is_closed:
+            return "Closed"
+        return f"{self.start_time} - {self.end_time}"
+
 class Language(db.Model):
     __tablename__ = "languages"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -512,6 +596,12 @@ class Language(db.Model):
         secondary="guided_visit_languages",
         back_populates="languages"
     )
+
+    def __repr__(self) -> str:
+        return f"Language(id={self.id!r}, code={self.code!r}, name={self.name!r})"
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.code})"
 
 # Association table between Museum and Language
 museum_language = Table(
@@ -549,6 +639,12 @@ class Audioguide(db.Model):
     # Relationships
     museum: Mapped["Museum"] = relationship(back_populates="audioguides")
     languages: Mapped[list["Language"]] = relationship(secondary="audioguide_language")
+
+    def __repr__(self) -> str:
+        return f"Audioguide(id={self.id!r}, museum_id={self.museum_id!r}, audioguide_type={self.audioguide_type!r})"
+
+    def __str__(self) -> str:
+        return f"{self.audioguide_type}"
 
 # Association table between Audioguide and Language    
 audioguide_language = Table(
@@ -634,6 +730,9 @@ class GuidedVisit(ScheduleConditionsMixin, db.Model):
 
     def __repr__(self) -> str:
         return f"GuidedVisit(id={self.id!r}, name={self.name!r})"
+
+    def __str__(self) -> str:
+        return f"{self.name}"
 
 guided_visit_languages = Table(
     "guided_visit_languages",
