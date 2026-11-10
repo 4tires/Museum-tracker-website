@@ -176,3 +176,10 @@ body {
 @media (max-width: 600px) {
   .auth-card { margin: 1rem 0; padding: 0; border: none; }
 }
+
+.rule { margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 0.4rem; }
+.day-picks { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.bulk { margin-top: 1rem; border: 1px solid #ddd; border-radius: 0.4rem; }
+.preview { padding: 0.5rem 1rem; background: #f6f6f6; border-radius: 0.4rem; }
+.form-errors { color: #b3261e; }
+.form-warning { color: #8a5a00; font-size: 0.9rem; }

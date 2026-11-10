@@ -1,10 +1,10 @@
 from flask import abort, redirect, request, url_for
-from flask_admin import Admin, AdminIndexView
+from flask_admin import Admin, AdminIndexView, BaseView, expose
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.model.template import EndpointLinkRowAction
 from flask_admin.theme import Bootstrap4Theme
 from flask_login import current_user
-from flask_security import hash_password
+from flask_security import hash_password, current_user
 from flask_wtf import FlaskForm
 from markupsafe import Markup
 from wtforms import PasswordField
@@ -12,6 +12,7 @@ from wtforms import PasswordField
 from .. import models
 from ..extensions import db
 
+from .hours_admin import MuseumHoursMixin
 
 class AdminAccessMixin:
     def is_accessible(self):
@@ -49,6 +50,17 @@ class BaseView(AdminAccessMixin, ModelView):
     }
 
 
+class OpeningHoursView(BaseView):
+    def is_accessible(self):
+        return current_user.is_authenticated and current_user.has_role("admin")
+
+    @expose("/", methods=["GET", "POST"])
+    def index(self):
+        museum = db.get_or_404(Museum, request.args.get("museum_id", type=int))
+        # ...same body as edit_hours(), but redirects go to
+        # url_for("hours.index", museum_id=museum.id)
+        return self.render("museums/hours_edit.html", museum=museum)
+
 class UserView(BaseView):
     column_exclude_list = ("password", "fs_uniquifier")
     form_excluded_columns = (
@@ -65,7 +77,8 @@ class UserView(BaseView):
             raise ValueError("A password is required for new users.")
 
 
-class MuseumView(BaseView):
+class MuseumView(MuseumHoursMixin, BaseView):
+    edit_template = "admin/museum/edit.html"
     column_list = ("name", "city", "country", "image_url", "website")
     column_searchable_list = ("name", "city")
     column_filters = ("country", "city")

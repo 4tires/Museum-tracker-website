@@ -1,0 +1,338 @@
+{# Opening-hours editor, included under the museum edit form.
+   Context: model (the museum), return_url, and the hours_* variables from hours_context(). #}
+
+{% macro rule_block(i, r) %}
+<div class="card mb-3">
+    <div class="card-body">
+        <button type="button" class="btn btn-sm btn-outline-danger float-right" onclick="this.closest('.card').remove()">Remove</button>
+        
+        <h5>Rule</h5>
+        
+        {# Type #}
+        <div class="form-group">
+            <label>Type</label>
+            <select class="form-control" name="rules-{{ i }}-kind">
+                <option value="weekly" {% if r.kind == 'weekly' %}selected{% endif %}>Weekdays</option>
+                <option value="date" {% if r.kind == 'date' %}selected{% endif %}>Annual date (e.g. 25 December)</option>
+                <option value="holidays" {% if r.kind == 'holidays' %}selected{% endif %}>Public holidays</option>
+            </select>
+        </div>
+
+        {# Weekdays (if weekly) #}
+        {% if r.kind == 'weekly' or i == '__i__' %}
+        <div class="form-group">
+            <label>Which days?</label>
+            <div class="d-flex flex-wrap">
+                {% for d in hours_weekdays %}
+                <div class="form-check form-check-inline mr-3">
+                    <input class="form-check-input" type="checkbox" name="rules-{{ i }}-days" value="{{ loop.index0 }}" id="rules-{{ i }}-days-{{ loop.index0 }}" {% if loop.index0|string in r.days %}checked{% endif %}>
+                    <label class="form-check-label" for="rules-{{ i }}-days-{{ loop.index0 }}">{{ d[:3] }}</label>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '1,2,3,4,5')">Mon–Fri</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '1,2,3,4,5,6')">Tue–Sun</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '5,6')">Weekend</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '0,1,2,3,4,5,6')">Every day</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '')">Clear</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Which week of the month?</label>
+            <select class="form-control" name="rules-{{ i }}-week_of_month">
+                <option value="">Every week</option>
+                {% for key, name in hours_ordinals.items() %}
+                    <option value="{{ key }}" {% if r.week_of_month == key|string %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {# Date (if date) #}
+        {% if r.kind == 'date' %}
+        <div class="row">
+            <div class="col-auto">
+                <label>Month</label>
+                <select class="form-control" name="rules-{{ i }}-month">
+                    {% for m in hours_months %}
+                        <option value="{{ loop.index }}" {% if r.month == loop.index|string %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <label>Day</label>
+                <input type="number" class="form-control" name="rules-{{ i }}-day" value="{{ r.day }}" min="1" max="31">
+            </div>
+        </div>
+        {% endif %}
+
+        {# --- HOURS AND CLOSED (SAME ROW) --- #}
+        <div class="row align-items-end mt-3">
+            <div class="col-auto pb-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="rules-{{ i }}-closed" value="1" id="rules-{{ i }}-closed" {% if r.closed %}checked{% endif %} onchange="toggleClosed(this)">
+                    <label class="form-check-label font-weight-bold" for="rules-{{ i }}-closed">Closed</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <label>Opens</label>
+                <input type="time" class="form-control" name="rules-{{ i }}-start_time" value="{{ r.start_time }}">
+            </div>
+            <div class="col-auto">
+                <label>Closes</label>
+                <input type="time" class="form-control" name="rules-{{ i }}-end_time" value="{{ r.end_time }}">
+            </div>
+            <div class="col-auto">
+                <label>Last entry</label>
+                <input type="time" class="form-control" name="rules-{{ i }}-last_entry" value="{{ r.last_entry }}">
+            </div>
+        </div>
+
+        {# --- YEARLY PERIOD (ALWAYS VISIBLE + CHECKBOX) --- #}
+        <div class="form-check mt-4">
+            <input class="form-check-input" type="checkbox" name="rules-{{ i }}-has_period" value="1" id="rules-{{ i }}-has_period" {% if r.month_from %}checked{% endif %} onchange="togglePeriod(this)">
+            <label class="form-check-label font-weight-bold" for="rules-{{ i }}-has_period">Only during part of the year</label>
+        </div>
+        <div class="row mt-2">
+            <div class="col-auto">
+                <label>From</label>
+                <select class="form-control" name="rules-{{ i }}-month_from">
+                    <option value="">Month</option>
+                    {% for m in hours_months %}
+                        <option value="{{ loop.index }}" {% if r.month_from == loop.index|string %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <label>Day</label>
+                <input type="number" class="form-control" name="rules-{{ i }}-day_from" value="{{ r.day_from }}" min="1" max="31" placeholder="Day">
+            </div>
+            <div class="col-auto align-self-end pt-4">—</div>
+            <div class="col-auto">
+                <label>To</label>
+                <select class="form-control" name="rules-{{ i }}-month_to">
+                    <option value="">Month</option>
+                    {% for m in hours_months %}
+                        <option value="{{ loop.index }}" {% if r.month_to == loop.index|string %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <label>Day</label>
+                <input type="number" class="form-control" name="rules-{{ i }}-day_to" value="{{ r.day_to }}" min="1" max="31" placeholder="Day">
+            </div>
+        </div>
+        <small class="form-text text-muted">(each year; can't cross 1 January)</small>
+
+        {# --- LABEL, NOTES, SPECIAL HOURS (ALWAYS VISIBLE) --- #}
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <label>Label</label>
+                <input type="text" class="form-control" name="rules-{{ i }}-label" value="{{ r.label }}" placeholder="Label">
+            </div>
+            <div class="col-md-8">
+                <label>Notes</label>
+                <input type="text" class="form-control" name="rules-{{ i }}-notes" value="{{ r.notes }}" placeholder="Notes">
+            </div>
+        </div>
+        <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="rules-{{ i }}-is_special" value="1" id="rules-{{ i }}-is_special" {% if r.is_special %}checked{% endif %}>
+            <label class="form-check-label" for="rules-{{ i }}-is_special">Special hours (listed apart from the regular weekly table)</label>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+<h3>Opening hours</h3>
+
+<h4>Current rows</h4>
+{% if hours_existing %}
+<form method="post" action="{{ get_url('.hours_view', museum_id=model.id) }}">
+    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+    <input type="hidden" name="return_url" value="{{ return_url }}">
+    
+    <table class="table table-striped table-bordered">
+        <thead>
+            <tr>
+                <th></th>
+                <th>When</th>
+                <th>Period</th>
+                <th>Hours</th>
+                <th>Last entry</th>
+                <th>Label / notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in hours_existing %}
+            <tr>
+                <td><input type="checkbox" name="selected" value="{{ e.id }}"></td>
+                <td>{{ e.text.when }}</td>
+                <td>{{ e.text.period }}</td>
+                <td>{{ e.text.hours }}</td>
+                <td>{{ e.text.last_entry }}</td>
+                <td>{{ e.text.label }}{% if e.text.label and e.text.notes %} · {% endif %}{{ e.text.notes }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h5>Change the selected rows</h5>
+    <p class="text-muted">Fill in only what should change.</p>
+    <div class="row">
+        <div class="col-auto">
+            <label>Opens</label>
+            <input type="time" class="form-control" name="bulk_start">
+        </div>
+        <div class="col-auto">
+            <label>Closes</label>
+            <input type="time" class="form-control" name="bulk_end">
+        </div>
+        <div class="col-auto">
+            <label>Last entry</label>
+            <input type="time" class="form-control" name="bulk_last_entry">
+        </div>
+        <div class="col-auto align-self-end">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="bulk_clear_last_entry" value="1" id="bulk_clear_last_entry">
+                <label class="form-check-label" for="bulk_clear_last_entry">Remove last entry</label>
+            </div>
+        </div>
+    </div>
+    <div class="form-group mt-2">
+        <label>Notes</label>
+        <input type="text" class="form-control" name="bulk_notes">
+    </div>
+    <button type="submit" name="action" value="bulk_update" class="btn btn-primary">Apply to selected</button>
+    <button type="submit" name="action" value="delete" class="btn btn-danger" onclick="return confirm('Delete selected rows?')">Delete selected</button>
+</form>
+{% else %}
+<p class="text-muted">No opening hours yet. Add some below.</p>
+{% endif %}
+
+<hr>
+
+<h4>Add hours</h4>
+<p class="text-muted">Each rule becomes one row per selected day. Use Preview to check the rows before saving.</p>
+
+<form id="hours-rules-form" method="post" data-url="{{ get_url('.hours_view', museum_id=model.id) }}">
+    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+    <input type="hidden" name="return_url" value="{{ return_url }}">
+    
+    <div id="hours-rules-container">
+        {% for r in hours_rules %}{{ rule_block(loop.index0, r) }}{% endfor %}
+    </div>
+    
+    <button type="button" class="btn btn-secondary mb-3" onclick="addRule()">+ Add another rule</button>
+    
+    <div id="hours-preview-container"></div>
+    
+    <button type="button" class="btn btn-info" onclick="previewHours()">Preview</button>
+    <button type="button" class="btn btn-success" onclick="saveHours()">Save hours</button>
+</form>
+
+<div id="blank-rule-template" style="display: none;">
+    {{ rule_block("__i__", hours_blank) }}
+</div>
+
+<script>
+function toggleClosed(checkbox) {
+    const namePrefix = checkbox.name.replace('-closed', '');
+    const start = document.querySelector(`[name="${namePrefix}-start_time"]`);
+    const end = document.querySelector(`[name="${namePrefix}-end_time"]`);
+    const last = document.querySelector(`[name="${namePrefix}-last_entry"]`);
+    
+    if (checkbox.checked) {
+        [start, end, last].forEach(el => { 
+            if(el) { el.value = ''; el.disabled = true; el.style.opacity = '0.5'; } 
+        });
+    } else {
+        [start, end, last].forEach(el => { 
+            if(el) { el.disabled = false; el.style.opacity = '1'; } 
+        });
+    }
+}
+
+function togglePeriod(checkbox) {
+    const namePrefix = checkbox.name.replace('-has_period', '');
+    const fields = ['month_from', 'day_from', 'month_to', 'day_to'];
+    
+    if (checkbox.checked) {
+        fields.forEach(f => {
+            const el = document.querySelector(`[name="${namePrefix}-${f}"]`);
+            if(el) { el.disabled = false; el.style.opacity = '1'; }
+        });
+    } else {
+        fields.forEach(f => {
+            const el = document.querySelector(`[name="${namePrefix}-${f}"]`);
+            if(el) { el.value = ''; el.disabled = true; el.style.opacity = '0.5'; }
+        });
+    }
+}
+
+function setDays(btn, daysStr) {
+    const card = btn.closest('.card');
+    const checkboxes = card.querySelectorAll('input[name$="-days"]');
+    const days = daysStr ? daysStr.split(',') : [];
+    checkboxes.forEach(cb => {
+        cb.checked = days.includes(cb.value);
+    });
+}
+
+// Initialize states on page load for existing rules
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input[type="checkbox"][name$="-closed"]').forEach(cb => toggleClosed(cb));
+    document.querySelectorAll('input[type="checkbox"][name$="-has_period"]').forEach(cb => togglePeriod(cb));
+});
+
+let ruleIndex = {{ hours_rules|length }};
+
+function addRule() {
+    const template = document.getElementById('blank-rule-template').innerHTML;
+    const html = template.replace(/__i__/g, ruleIndex);
+    document.getElementById('hours-rules-container').insertAdjacentHTML('beforeend', html);
+    ruleIndex++;
+    
+    // Re-initialize toggles for the new rule
+    const newCard = document.getElementById('hours-rules-container').lastElementChild;
+    const closedCb = newCard.querySelector('input[name$="-closed"]');
+    const periodCb = newCard.querySelector('input[name$="-has_period"]');
+    if (closedCb) toggleClosed(closedCb);
+    if (periodCb) togglePeriod(periodCb);
+}
+
+function previewHours() {
+    const form = document.getElementById('hours-rules-form');
+    const data = new FormData(form);
+    data.append('action', 'preview');
+    
+    fetch(form.dataset.url, {
+        method: 'POST',
+        body: data
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('hours-preview-container').innerHTML = data.html;
+    });
+}
+
+function saveHours() {
+    const form = document.getElementById('hours-rules-form');
+    const data = new FormData(form);
+    data.append('action', 'save');
+    
+    fetch(form.dataset.url, {
+        method: 'POST',
+        body: data
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.saved) {
+            location.reload();
+        } else {
+            document.getElementById('hours-preview-container').innerHTML = data.html;
+        }
+    });
+}
+</script>

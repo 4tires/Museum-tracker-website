@@ -1,0 +1,30 @@
+{% if expansion %}
+  <div class="hours-preview">
+    <h5>Preview</h5>
+    {% if expansion.errors %}
+      <ul class="hours-errors">
+        {% for e in expansion.errors %}<li>{{ e }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+    {% if expansion.rows %}
+      <table class="table table-sm">
+        <thead><tr><th></th><th>When</th><th>Period</th><th>Hours</th><th>Last entry</th></tr></thead>
+        <tbody>
+          {% for n in expansion.rows %}
+            <tr{% if n.is_duplicate %} class="text-muted"{% endif %}>
+              <td>{{ "Already exists" if n.is_duplicate else "New" }}</td>
+              <td>{{ n.text.when }}{% if n.text.label %} · {{ n.text.label }}{% endif %}</td>
+              <td>{{ n.text.period }}</td>
+              <td>{{ n.text.hours }}</td>
+              <td>{{ n.text.last_entry }}</td>
+            </tr>
+            {% if n.warning %}
+              <tr><td></td><td colspan="4" class="hours-warning">{{ n.warning }}</td></tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+      <p>{{ expansion.to_add | length }} to add{% if expansion.duplicate_count %}, {{ expansion.duplicate_count }} already exist (skipped){% endif %}.</p>
+    {% endif %}
+  </div>
+{% endif %}
