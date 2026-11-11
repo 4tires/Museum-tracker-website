@@ -1,0 +1,556 @@
+{# Tickets editor, included under the museum edit form.
+   Context: model (the museum) and the tickets_* / ticket_* variables from tickets_context(). #}
+
+{% macro season_row(i) %}
+  <div class="season-row form-row align-items-end mb-2">
+    <div class="form-group col-md-3 mb-0">
+      <label class="small mb-0">Price</label>
+      <div class="input-group">
+        <input class="form-control" name="seasons-{{ i }}-price" inputmode="decimal" placeholder="0.00" autocomplete="off">
+        <div class="input-group-append"><span class="input-group-text season-currency">EUR</span></div>
+      </div>
+    </div>
+    <div class="form-group col-md-4 mb-0">
+      <label class="small mb-0">From <span class="text-muted">(day, month)</span></label>
+      <div class="input-group">
+        <input class="form-control" type="number" min="1" max="31" name="seasons-{{ i }}-day_from" placeholder="day">
+        <select class="form-control" name="seasons-{{ i }}-month_from">
+          <option value="">All year</option>
+          {% for m in ticket_months %}<option value="{{ loop.index }}">{{ m }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-group col-md-4 mb-0">
+      <label class="small mb-0">To <span class="text-muted">(day, month)</span></label>
+      <div class="input-group">
+        <input class="form-control" type="number" min="1" max="31" name="seasons-{{ i }}-day_to" placeholder="day">
+        <select class="form-control" name="seasons-{{ i }}-month_to">
+          <option value="">—</option>
+          {% for m in ticket_months %}<option value="{{ loop.index }}">{{ m }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="col-md-1 mb-0 text-right">
+      <button type="button" class="btn btn-sm btn-outline-danger season-remove" title="Remove this price">&times;</button>
+    </div>
+  </div>
+{% endmacro %}
+
+<style>
+  #tickets-panel { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ddd; }
+  #tickets-panel .ticket-row td { vertical-align: middle; }
+  #tickets-panel .ticket-group td { background: rgba(0, 0, 0, .05); }
+  #tickets-bulk { position: sticky; top: 0; z-index: 5; }
+  #ticket-modal details { margin-bottom: 1rem; }
+  #ticket-modal summary { cursor: pointer; font-weight: 600; }
+  #ticket-modal .season-row:first-child .season-remove { visibility: hidden; }
+</style>
+
+<section id="tickets-panel">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="mb-0">Tickets <span class="text-muted h6">{{ tickets_count }}</span></h3>
+    <button type="button" class="btn btn-success" id="ticket-add">+ Add ticket</button>
+  </div>
+
+  {% if tickets_unlisted %}
+    <div class="alert alert-warning py-2">
+      {{ tickets_unlisted }} ticket{{ 's' if tickets_unlisted != 1 }} not shown on the museum page: no current exhibition is linked.
+    </div>
+  {% endif %}
+
+  {% if tickets_groups %}
+    <input type="search" id="tickets-filter" class="form-control form-control-sm mb-2" placeholder="Filter tickets (name, who, when, exhibition)">
+
+    {# Appears when rows are ticked. The ticked checkboxes belong to this form through their form="" attribute. #}
+    <form id="tickets-bulk-form" class="card card-body py-2 mb-2 d-none" onsubmit="return false">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      <div class="mb-2"><strong id="tickets-selected-count">0</strong> selected</div>
+
+      <div class="form-row align-items-center mb-2">
+        <div class="col-auto">Price</div>
+        <div class="col-auto">
+          <select class="form-control form-control-sm" name="price_mode">
+            <option value="percent">change by %</option>
+            <option value="add">change by amount</option>
+            <option value="set">set to</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <input class="form-control form-control-sm" name="price_amount" size="7" inputmode="decimal" placeholder="e.g. 5 or -2,50" autocomplete="off">
+        </div>
+        <div class="col-auto">
+          <button type="button" class="btn btn-sm btn-secondary" data-bulk="bulk_price_preview">Preview</button>
+          <button type="button" class="btn btn-sm btn-primary" data-bulk="bulk_price">Apply</button>
+        </div>
+      </div>
+
+      <div class="form-row align-items-center mb-2">
+        <div class="col-auto">Exhibitions</div>
+        <div class="col-auto">
+          <select class="form-control form-control-sm" name="exhibition_mode">
+            <option value="add">add</option>
+            <option value="remove">remove</option>
+            <option value="replace">replace with</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          {% for e in ticket_exhibitions %}
+            <label class="mr-2 mb-0 {{ 'text-muted' if e.archived }}">
+              <input type="checkbox" name="bulk_exhibition_ids" value="{{ e.id }}"> {{ e.name }}{{ ' (archived)' if e.archived }}
+            </label>
+          {% endfor %}
+        </div>
+        <div class="col-auto">
+          <button type="button" class="btn btn-sm btn-primary" data-bulk="bulk_exhibitions">Apply</button>
+        </div>
+      </div>
+
+      <div>
+        <button type="button" class="btn btn-sm btn-outline-danger" data-bulk="delete">Delete selected</button>
+      </div>
+      <div id="tickets-bulk-result" class="mt-2"></div>
+    </form>
+
+    <table class="table table-sm table-hover" id="tickets-table">
+      <thead>
+        <tr>
+          <th style="width: 2rem"></th>
+          <th>Ticket</th>
+          <th>Price</th>
+          <th>Who</th>
+          <th>When</th>
+          <th>Exhibitions</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in tickets_groups %}
+          <tr class="ticket-group" data-group="{{ g.key }}">
+            <td><input type="checkbox" class="group-select" data-group="{{ g.key }}" aria-label="Select all in {{ g.title }}"></td>
+            <td colspan="6"><strong>{{ g.title }}</strong> <span class="text-muted">· {{ g.rows | length }} ticket{{ 's' if g.rows | length != 1 }}</span></td>
+          </tr>
+          {% for r in g.rows %}
+            <tr class="ticket-row" data-group="{{ g.key }}"
+                data-search="{{ (r.label ~ ' ' ~ r.audience ~ ' ' ~ r.when ~ ' ' ~ r.exhibitions ~ ' ' ~ r.terms) | lower }}">
+              <td><input type="checkbox" class="ticket-select" name="selected" value="{{ r.id }}" form="tickets-bulk-form" data-group="{{ g.key }}"></td>
+              <td>
+                <a href="#" class="ticket-edit font-weight-bold" data-id="{{ r.id }}">{{ r.label }}</a>
+                {% if r.notes %}<i class="fa fa-info-circle text-muted ml-1" title="{{ r.notes }}"></i>{% endif %}
+                {% if r.terms %}<div class="small text-muted">{{ r.terms }}</div>{% endif %}
+              </td>
+              <td class="text-nowrap">{{ r.price }}</td>
+              <td>{{ r.audience }}</td>
+              <td>{{ r.when or '—' }}</td>
+              <td>
+                {% if r.unlisted %}
+                  <span class="badge badge-warning" title="No current exhibition is linked, so visitors don't see this ticket.">Not shown on site</span>
+                {% else %}
+                  {{ r.exhibitions }}
+                {% endif %}
+                {% if r.archived %}<span class="small text-muted">(+{{ r.archived }} archived)</span>{% endif %}
+              </td>
+              <td class="text-nowrap text-right">
+                <button type="button" class="btn btn-sm btn-outline-secondary ticket-edit" data-id="{{ r.id }}">Edit</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary ticket-duplicate" data-id="{{ r.id }}" title="Start a new ticket from this one">Duplicate</button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="text-muted">No tickets yet. Add the first one.</p>
+  {% endif %}
+</section>
+
+{# One form for adding, editing and duplicating. Filled by script from tickets-data. #}
+<div class="modal fade" id="ticket-modal" tabindex="-1" role="dialog" aria-labelledby="ticket-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+    <form class="modal-content" id="ticket-form" method="post" onsubmit="return false"
+          data-url="{{ get_url('.tickets_view', museum_id=model.id) }}">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      <input type="hidden" name="ticket_id" value="">
+
+      <div class="modal-header">
+        <h5 class="modal-title" id="ticket-modal-title">Ticket</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label>Ticket label</label>
+            <input class="form-control" name="label" maxlength="100" autocomplete="off">
+          </div>
+          <div class="form-group col-md-2">
+            <label>Currency</label>
+            <input class="form-control" name="currency" maxlength="3" value="EUR">
+          </div>
+          <div class="form-group col-md-4">
+            <label>Museum pass</label>
+            <select class="form-control" name="pass_id">
+              <option value="">None</option>
+              {% for p in ticket_passes %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <h6 class="mb-1">Prices</h6>
+        <p class="small text-muted mb-2">
+          Leave the dates empty if the price is valid all year. To sell the same ticket at different prices in
+          different seasons, add a price for each one.
+        </p>
+        <div id="ticket-seasons">{{ season_row(0) }}</div>
+        <p class="mt-2"><button type="button" class="btn btn-sm btn-outline-secondary" id="season-add">+ Add a price for another season</button></p>
+
+        <details data-fields="min_age max_age resident_country resident_municipality is_student">
+          <summary>Who it's for</summary>
+          <div class="form-row mt-2">
+            <div class="form-group col-md-2">
+              <label>Min. age</label>
+              <input class="form-control" type="number" min="0" name="min_age">
+            </div>
+            <div class="form-group col-md-2">
+              <label>Max. age</label>
+              <input class="form-control" type="number" min="0" name="max_age">
+            </div>
+            <div class="form-group col-md-2">
+              <label>Country</label>
+              <input class="form-control" maxlength="2" name="resident_country" placeholder="PT">
+            </div>
+            <div class="form-group col-md-4">
+              <label>Municipality</label>
+              <input class="form-control" name="resident_municipality">
+            </div>
+            <div class="form-group col-md-2 d-flex align-items-end">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="is_student" value="1" id="tk-student">
+                <label class="form-check-label" for="tk-student">Student</label>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details data-fields="schedule_kind start_time end_time">
+          <summary>Only on certain days or times</summary>
+          <div class="form-row mt-2">
+            <div class="form-group col-md-4">
+              <label>Applies</label>
+              <select class="form-control" name="schedule_kind">
+                <option value="always">Always</option>
+                <option value="weekday">On a weekday</option>
+                <option value="date">On a date every year</option>
+                <option value="holidays">On public holidays</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4 sch-weekday">
+              <label>Weekday</label>
+              <select class="form-control" name="weekday">
+                <option value="">—</option>
+                {% for name in ticket_weekdays %}<option value="{{ loop.index0 }}">{{ name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-4 sch-weekday">
+              <label>Which week</label>
+              <select class="form-control" name="week_of_month">
+                <option value="">Every week</option>
+                {% for key, name in ticket_ordinals.items() %}<option value="{{ key }}">{{ name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-4 sch-date">
+              <label>Month</label>
+              <select class="form-control" name="month">
+                <option value="">—</option>
+                {% for m in ticket_months %}<option value="{{ loop.index }}">{{ m }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-4 sch-date">
+              <label>Day</label>
+              <input class="form-control" type="number" min="1" max="31" name="day">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label>From</label>
+              <input class="form-control" type="time" name="start_time">
+            </div>
+            <div class="form-group col-md-4">
+              <label>Until</label>
+              <input class="form-control" type="time" name="end_time">
+            </div>
+          </div>
+        </details>
+
+        <details data-fields="entry_policy validity validity_value validity_unit">
+          <summary>Validity and entry</summary>
+          <div class="form-row mt-2">
+            <div class="form-group col-md-4">
+              <label>Entry</label>
+              <select class="form-control" name="entry_policy">
+                <option value="anytime">Anytime</option>
+                <option value="recommended">Booking recommended</option>
+                <option value="timed_slot">Timed slot required</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label>Valid for</label>
+              <select class="form-control" name="validity">
+                <option value="single_entry">A single entry</option>
+                <option value="same_day">The same day</option>
+                <option value="period">A period</option>
+              </select>
+            </div>
+            <div class="form-group col-md-2 validity-period">
+              <label>Duration</label>
+              <input class="form-control" type="number" min="1" name="validity_value">
+            </div>
+            <div class="form-group col-md-2 validity-period">
+              <label>Unit</label>
+              <select class="form-control" name="validity_unit">
+                <option value="">—</option>
+                <option value="hours">hours</option>
+                <option value="days">days</option>
+                <option value="months">months</option>
+                <option value="years">years</option>
+              </select>
+            </div>
+          </div>
+        </details>
+
+        <h6 class="mb-1">Exhibitions it gives access to</h6>
+        {% if ticket_exhibitions %}
+          <p class="small mb-1">
+            <a href="#" id="ex-all">All current</a> · <a href="#" id="ex-none">None</a>
+          </p>
+          <div class="row mb-3">
+            {% for e in ticket_exhibitions %}
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="exhibition_ids" value="{{ e.id }}" id="tk-ex-{{ e.id }}" data-archived="{{ 1 if e.archived else 0 }}">
+                  <label class="form-check-label {{ 'text-muted' if e.archived }}" for="tk-ex-{{ e.id }}">{{ e.name }}{{ ' (archived)' if e.archived }}</label>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted">This museum has no exhibitions yet. Visitors only see tickets linked to an exhibition.</p>
+        {% endif %}
+
+        <div class="form-group">
+          <label>Notes <span class="text-muted">(shown as a tooltip)</span></label>
+          <textarea class="form-control" name="notes" rows="2"></textarea>
+        </div>
+
+        <div id="ticket-preview"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-danger mr-auto" id="ticket-delete">Delete</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-primary" data-ticket="preview">Preview</button>
+        <button type="button" class="btn btn-primary" data-ticket="save">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<template id="ticket-season-template">{{ season_row("__i__") }}</template>
+<script type="application/json" id="tickets-data">{{ tickets_data | tojson }}</script>
+
+<script>
+  // Runs after the page has loaded: the admin layout loads jQuery and Bootstrap's modal after this point.
+  document.addEventListener("DOMContentLoaded", function () {
+    var panel = document.getElementById("tickets-panel");
+    if (!panel) return;
+
+    var data = JSON.parse(document.getElementById("tickets-data").textContent);
+    var modalEl = document.getElementById("ticket-modal");
+    document.body.appendChild(modalEl);          // keep the modal out of any positioned parent
+    var form = document.getElementById("ticket-form");
+    var bulk = document.getElementById("tickets-bulk-form");
+    var seasons = document.getElementById("ticket-seasons");
+    var seasonTemplate = document.getElementById("ticket-season-template");
+    var preview = document.getElementById("ticket-preview");
+    var url = form.dataset.url;
+    var mode = "add";
+    var nextSeason = 1;
+
+    var PLAIN = ["label", "currency", "pass_id", "notes", "entry_policy", "validity", "validity_value",
+                 "validity_unit", "min_age", "max_age", "resident_country", "resident_municipality",
+                 "schedule_kind", "weekday", "week_of_month", "month", "day", "start_time", "end_time"];
+    var SEASON = ["price", "month_from", "day_from", "month_to", "day_to"];
+
+    function setField(name, value) {
+      var el = form.elements[name];
+      if (!el) return;
+      if (el.type === "checkbox") el.checked = !!value;
+      else el.value = value == null ? "" : value;
+    }
+
+    // Show only the fields that matter for the chosen schedule and validity.
+    function sync() {
+      var kind = form.elements.schedule_kind.value;
+      form.querySelectorAll(".sch-weekday").forEach(function (el) { el.hidden = kind !== "weekday"; });
+      form.querySelectorAll(".sch-date").forEach(function (el) { el.hidden = kind !== "date"; });
+      form.querySelectorAll(".validity-period").forEach(function (el) { el.hidden = form.elements.validity.value !== "period"; });
+      var currency = (form.elements.currency.value || "EUR").toUpperCase();
+      form.querySelectorAll(".season-currency").forEach(function (el) { el.textContent = currency; });
+    }
+
+    // Open a section when it holds something that isn't the default.
+    function openFilledSections() {
+      form.querySelectorAll("details[data-fields]").forEach(function (d) {
+        var used = d.dataset.fields.split(" ").some(function (name) {
+          var el = form.elements[name];
+          if (!el) return false;
+          if (el.type === "checkbox") return el.checked;
+          return el.value !== "" && el.value !== el.options?.[0]?.value;
+        });
+        d.open = used;
+      });
+    }
+
+    function openModal(kind, id) {
+      mode = kind;
+      form.reset();
+      seasons.querySelectorAll(".season-row:not(:first-child)").forEach(function (row) { row.remove(); });
+      nextSeason = 1;
+      preview.innerHTML = "";
+
+      var t = id ? data.tickets[id] : null;
+      if (t) {
+        PLAIN.forEach(function (name) { setField(name, t[name]); });
+        setField("is_student", t.is_student);
+        SEASON.forEach(function (name) { setField("seasons-0-" + name, t.season[name]); });
+      }
+      var ids = t ? t.exhibition_ids : data.defaultExhibitions;
+      form.querySelectorAll('input[name="exhibition_ids"]').forEach(function (box) {
+        box.checked = ids.indexOf(parseInt(box.value, 10)) !== -1;
+      });
+
+      form.elements.ticket_id.value = kind === "edit" ? id : "";
+      document.getElementById("ticket-modal-title").textContent =
+        kind === "edit" ? "Edit ticket" : kind === "duplicate" ? "Duplicate ticket" : "Add ticket";
+      document.getElementById("ticket-delete").hidden = kind !== "edit";
+      document.getElementById("season-add").hidden = kind === "edit";   // editing changes one row
+      sync();
+      openFilledSections();
+      $(modalEl).one("shown.bs.modal", function () {
+        form.elements.label.focus();
+        if (kind === "duplicate") form.elements.label.select();
+      });
+      $(modalEl).modal("show");
+    }
+
+    // The server answers JSON; anything else (login page, error page) means the session needs attention.
+    function send(body, done) {
+      fetch(url, { method: "POST", body: body, credentials: "same-origin" })
+        .then(function (r) { return r.json(); })
+        .then(done)
+        .catch(function () {
+          done({ saved: false, html: '<div class="alert alert-danger">The request failed. Reload the page and try again.</div>' });
+        });
+    }
+
+    function post(formEl, action, extra, box) {
+      var body = new FormData(formEl);
+      body.append("action", action);
+      Object.keys(extra || {}).forEach(function (k) { body.append(k, extra[k]); });
+      send(body, function (res) {
+        if (res.saved) location.reload();
+        else box.innerHTML = res.html;
+      });
+    }
+
+    // --- the modal ---
+    document.getElementById("ticket-add").addEventListener("click", function () { openModal("add"); });
+
+    panel.addEventListener("click", function (e) {
+      var button = e.target.closest(".ticket-edit, .ticket-duplicate");
+      if (!button) return;
+      e.preventDefault();
+      openModal(button.classList.contains("ticket-duplicate") ? "duplicate" : "edit", button.dataset.id);
+    });
+
+    form.addEventListener("change", function () { sync(); });
+    form.addEventListener("input", function (e) { if (e.target.name === "currency") sync(); });
+
+    form.querySelectorAll("[data-ticket]").forEach(function (button) {
+      button.addEventListener("click", function () { post(form, button.dataset.ticket, {}, preview); });
+    });
+
+    document.getElementById("ticket-delete").addEventListener("click", function () {
+      if (!confirm("Delete this ticket?")) return;
+      var body = new FormData();
+      body.append("action", "delete");
+      body.append("selected", form.elements.ticket_id.value);
+      if (form.elements.csrf_token) body.append("csrf_token", form.elements.csrf_token.value);
+      send(body, function (res) {
+        if (res.saved) location.reload(); else preview.innerHTML = res.html;
+      });
+    });
+
+    document.getElementById("season-add").addEventListener("click", function () {
+      seasons.insertAdjacentHTML("beforeend", seasonTemplate.innerHTML.replace(/__i__/g, nextSeason++));
+      sync();
+    });
+    seasons.addEventListener("click", function (e) {
+      if (e.target.classList.contains("season-remove")) e.target.closest(".season-row").remove();
+    });
+
+    var allCurrent = document.getElementById("ex-all");
+    if (allCurrent) {
+      allCurrent.addEventListener("click", function (e) {
+        e.preventDefault();
+        form.querySelectorAll('input[name="exhibition_ids"]').forEach(function (b) { b.checked = b.dataset.archived === "0"; });
+      });
+      document.getElementById("ex-none").addEventListener("click", function (e) {
+        e.preventDefault();
+        form.querySelectorAll('input[name="exhibition_ids"]').forEach(function (b) { b.checked = false; });
+      });
+    }
+
+    // --- the table ---
+    if (!bulk) return;
+    var result = document.getElementById("tickets-bulk-result");
+
+    function selectedBoxes() { return Array.prototype.slice.call(document.querySelectorAll(".ticket-select:checked")); }
+
+    function refreshBulk() {
+      var count = selectedBoxes().length;
+      document.getElementById("tickets-selected-count").textContent = count;
+      bulk.classList.toggle("d-none", count === 0);
+      result.innerHTML = "";
+    }
+
+    document.getElementById("tickets-table").addEventListener("change", function (e) {
+      if (e.target.classList.contains("group-select")) {
+        document.querySelectorAll('.ticket-select[data-group="' + e.target.dataset.group + '"]').forEach(function (box) {
+          if (!box.closest("tr").hidden) box.checked = e.target.checked;
+        });
+      }
+      refreshBulk();
+    });
+
+    bulk.querySelectorAll("[data-bulk]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var action = button.dataset.bulk;
+        if (action === "delete" && !confirm("Delete " + selectedBoxes().length + " selected ticket(s)?")) return;
+        if (action === "bulk_exhibitions" && bulk.elements.exhibition_mode.value === "replace" &&
+            !confirm("Replace the exhibitions of the selected tickets?")) return;
+        post(bulk, action, {}, result);
+      });
+    });
+
+    document.getElementById("tickets-filter").addEventListener("input", function (e) {
+      var q = e.target.value.trim().toLowerCase();
+      var visible = {};
+      document.querySelectorAll(".ticket-row").forEach(function (row) {
+        var show = !q || row.dataset.search.indexOf(q) !== -1;
+        row.hidden = !show;
+        if (show) visible[row.dataset.group] = true;
+      });
+      document.querySelectorAll(".ticket-group").forEach(function (row) { row.hidden = !visible[row.dataset.group]; });
+    });
+  });
+</script>

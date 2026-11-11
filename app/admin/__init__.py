@@ -13,6 +13,8 @@ from .. import models
 from ..extensions import db
 
 from .hours_admin import MuseumHoursMixin
+from .tickets_admin import MuseumTicketsMixin
+
 
 class AdminAccessMixin:
     def is_accessible(self):
@@ -35,12 +37,11 @@ def _format_date(view, context, model, name):
 
 def _format_image(view, context, model, name):
     url = getattr(model, name)
-    # Markup(...).format() escapes the URL; Markup("...".format(url)) does not.
     return Markup('<img src="{}" height="40" alt="">').format(url) if url else ""
 
 
 class BaseView(AdminAccessMixin, ModelView):
-    form_base_class = FlaskForm        # adds the CSRF token (you use CSRFProtect)
+    form_base_class = FlaskForm
     column_display_pk = True
     can_view_details = True
     page_size = 50
@@ -56,10 +57,9 @@ class OpeningHoursView(BaseView):
 
     @expose("/", methods=["GET", "POST"])
     def index(self):
-        museum = db.get_or_404(Museum, request.args.get("museum_id", type=int))
-        # ...same body as edit_hours(), but redirects go to
-        # url_for("hours.index", museum_id=museum.id)
+        museum = db.get_or_404(models.Museum, request.args.get("museum_id", type=int))
         return self.render("museums/hours_edit.html", museum=museum)
+
 
 class UserView(BaseView):
     column_exclude_list = ("password", "fs_uniquifier")
@@ -77,14 +77,12 @@ class UserView(BaseView):
             raise ValueError("A password is required for new users.")
 
 
-class MuseumView(MuseumHoursMixin, BaseView):
+class MuseumView(MuseumTicketsMixin, MuseumHoursMixin, BaseView):
     edit_template = "admin/museum/edit.html"
     column_list = ("name", "city", "country", "image_url", "website")
     column_searchable_list = ("name", "city")
     column_filters = ("country", "city")
     column_formatters = {**BaseView.column_formatters, "image_url": _format_image}
-    # Children get their own views; loading them all into multi-selects here
-    # would be slow and lets you reassign rows by accident.
     form_excluded_columns = (
         "created_at", "updated_at",
         "tickets", "exhibitions", "opening_hours", "audioguides", "guided_visits",
@@ -99,7 +97,6 @@ class MuseumView(MuseumHoursMixin, BaseView):
 
 class RoleView(BaseView):
     column_searchable_list = ("name",)
-    # Exclude the backref to users to avoid loading all users in a multi-select.
     form_excluded_columns = ("users",)
 
 

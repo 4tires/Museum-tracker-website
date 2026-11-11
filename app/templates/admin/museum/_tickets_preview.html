@@ -1,0 +1,60 @@
+{# What the tickets endpoint answers when nothing was saved: errors, warnings and a preview. #}
+{% if errors %}
+  <div class="alert alert-danger mb-2">
+    <ul class="mb-0 pl-3">
+      {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+{% if warnings %}
+  <div class="alert alert-warning mb-2">
+    <ul class="mb-0 pl-3">
+      {% for w in warnings %}<li>{{ w }}</li>{% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+{% if plan_rows %}
+  <table class="table table-sm mb-2">
+    <thead>
+      <tr><th></th><th>Ticket</th><th>Price</th><th>Who</th><th>When</th><th>Exhibitions</th></tr>
+    </thead>
+    <tbody>
+      {% for row in plan_rows %}
+        <tr>
+          <td><span class="badge badge-{{ 'success' if row.status == 'new' else 'info' }}">{{ 'New' if row.status == 'new' else 'Update' }}</span></td>
+          <td>{{ row.view.label }}</td>
+          <td class="text-nowrap">{{ row.view.price }}</td>
+          <td>{{ row.view.audience }}</td>
+          <td>{{ row.view.when or '—' }}</td>
+          <td>{{ row.view.exhibitions or '—' }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not errors %}
+    <p class="text-muted small mb-0">
+      {{ plan_rows | length }} ticket{{ 's' if plan_rows | length != 1 }} will be {{ 'created' if plan_rows[0].status == 'new' else 'updated' }}. Press Save to confirm.
+    </p>
+  {% endif %}
+{% endif %}
+
+{% if price_changes %}
+  <table class="table table-sm mb-2">
+    <thead><tr><th>Ticket</th><th>Season</th><th class="text-right">Now</th><th class="text-right">New price</th></tr></thead>
+    <tbody>
+      {% for c in price_changes %}
+        <tr>
+          <td>{{ c.label }}</td>
+          <td class="text-muted">{{ c.season }}</td>
+          <td class="text-right text-muted">{{ '%.2f' | format(c.old) }}</td>
+          <td class="text-right font-weight-bold">{{ '%.2f' | format(c.new) }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not errors %}
+    <p class="text-muted small mb-0">{{ price_changes | length }} price{{ 's' if price_changes | length != 1 }} would change. Press Apply to confirm.</p>
+  {% endif %}
+{% endif %}
