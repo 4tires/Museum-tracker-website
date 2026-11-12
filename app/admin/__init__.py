@@ -10,6 +10,16 @@ from markupsafe import Markup
 from wtforms import PasswordField
 from wtforms.validators import NumberRange
 from datetime import date
+from flask_admin.actions import action
+from flask_admin.contrib.sqla.fields import QuerySelectField
+from flask_admin.form import rules
+from sqlalchemy import inspect
+
+from .pass_prices_admin import PassPricesMixin
+from .schedule_forms import (
+    EXHIBITION_ARGS, SCHEDULE_ARGS, SCHEDULE_OVERRIDES,
+    ScheduleValidationMixin, exhibition_label, exhibition_query,
+)
 
 
 from ..museums.exhibitions import is_archived
@@ -181,17 +191,34 @@ class ExhibitionView(BaseView):
     column_formatters = {**BaseView.column_formatters,
                          "start_date": _format_date, "end_date": _format_date,
                          "image_url": _format_image}
-    # Tickets and user activity are managed from their own views.
     form_excluded_columns = ("tickets", "exhibition_visits",
                              "exhibition_wishlist", "exhibition_reviews")
+    form_extra_fields = {
+        "copy_tickets_from": QuerySelectField(
+            "Give it the same tickets as",
+            query_factory=exhibition_query, get_label=exhibition_label,
+            allow_blank=True, blank_text="—",
+            description="Adds this exhibition to every ticket that covers the chosen one "
+                        "(same museum). Fine-tune afterwards in Tickets.",
+        ),
+    }
     column_extra_row_actions = [
         EndpointLinkRowAction("fa fa-eye", "museums.exhibition",
                               id_arg="exhibition_id", title="View on site"),
     ]
     can_export = True
 
+    def on_model_change(self, form, model, is_created):
+        source = form.copy_tickets_from.data
+        if source is not None and source is not model:
+            if source.museum != model.museum:
+                raise ValueError("Copy tickets from an exhibition of the same museum")
+            for ticket in list(source.tickets):
+                if model not in ticket.exhibitions:
+                    ticket.exhibitions.append(model)
 
-class TicketView(BaseView):
+
+class TicketView(ScheduleValidationMixin, BaseView):
     column_list = ("museum", "label", "price", "currency", "museum_pass",
                    "min_age", "max_age", "is_student", "resident_municipality",
                    "resident_country", "entry_policy", "validity")
@@ -201,13 +228,53 @@ class TicketView(BaseView):
     column_default_sort = "museum_id"
     can_export = True
 
+    form_overrides = SCHEDULE_OVERRIDES
+    form_args = {**SCHEDULE_ARGS, "exhibitions": EXHIBITION_ARGS}
+    form_rules = [
+        rules.FieldSet(["museum", "label", "price", "currency", "notes"], "Basics"),
+        rules.FieldSet(["exhibitions"], "Covers these exhibitions"),
+        rules.FieldSet(["museum_pass", "is_student", "min_age", "max_age",
+                        "resident_country", "resident_municipality"], "Who it is for"),
+        rules.FieldSet(["entry_policy", "validity", "validity_value", "validity_unit"],
+                       "Booking and validity"),
+        rules.FieldSet(["month_from", "day_from", "month_to", "day_to"],
+                       "Season (leave empty for all year)"),
+        rules.FieldSet(["weekday", "week_of_month", "start_time", "end_time",
+                        "month", "day", "holidays"],
+                       "Special access rule (e.g. free first Monday, free on holidays)"),
+    ]
 
-class MuseumPassView(BaseView):
+    def on_model_change(self, form, model, is_created):
+        validity = getattr(model.validity, "value", model.validity)
+        if validity != "period":
+            model.validity_value = None       # only periods have a length
+            model.validity_unit = None
+        elif model.validity_value is None or model.validity_unit is None:
+            raise ValueError("A ticket valid for a period needs a length and a unit (e.g. 1 years)")
+        super().on_model_change(form, model, is_created)
+
+    @action("duplicate", "Duplicate", "Duplicate the selected tickets?")
+    def action_duplicate(self, ids):
+        try:
+            for t in self.session.scalars(db.select(models.Ticket).where(models.Ticket.id.in_(ids))):
+                values = {a.key: getattr(t, a.key) for a in inspect(models.Ticket).column_attrs
+                          if a.key not in ("id", "label")}
+                copy = models.Ticket(label=f"{t.label} (copy)", **values)
+                copy.exhibitions = list(t.exhibitions)
+                self.session.add(copy)
+            self.session.commit()
+            flash(f"Duplicated {len(ids)} tickets. Edit the copies to change their label or season.")
+        except Exception as ex:
+            self.session.rollback()
+            flash(f"Could not duplicate: {ex}", "error")
+
+
+class MuseumPassView(PassPricesMixin, BaseView):
+    edit_template = "admin/museum_pass/edit.html"
     column_list = ("name", "includes_transport", "website")
     column_searchable_list = ("name",)
-    form_excluded_columns = ("tickets",)
-    # Edit a pass's price list on the same page.
-    inline_models = (models.PassPrice,)
+    # Prices are edited in the panel on the edit page (see pass_prices_admin.py).
+    form_excluded_columns = ("tickets", "prices")
 
 
 class AudioguideView(BaseView):
@@ -217,15 +284,36 @@ class AudioguideView(BaseView):
     column_searchable_list = ("museum.name",)
 
 
-class GuidedVisitView(BaseView):
+class GuidedVisitView(ScheduleValidationMixin, BaseView):
     column_list = ("museum", "exhibition", "name", "weekday", "start_time",
                    "duration_minutes", "price", "requires_reservation", "languages")
     column_searchable_list = ("name", "museum.name")
-    column_filters = ("museum.name", "requires_reservation", "weekday")
+    column_filters = ("museum.name", "requires_reservation")
     column_formatters = {
         **BaseView.column_formatters,
         "weekday": lambda v, c, m, n: WEEKDAY_NAMES.get(m.weekday, ""),
     }
+
+    form_overrides = SCHEDULE_OVERRIDES
+    form_args = {**SCHEDULE_ARGS, "exhibition": EXHIBITION_ARGS}
+    form_rules = [
+        rules.FieldSet(["museum", "exhibition", "name", "description", "languages"], "Basics"),
+        rules.FieldSet(["duration_minutes", "max_participants", "price", "currency",
+                        "requires_reservation", "notes"], "Practical details"),
+        rules.FieldSet(["weekday", "week_of_month", "start_time", "end_time",
+                        "month", "day", "holidays"], "When"),
+        rules.FieldSet(["month_from", "day_from", "month_to", "day_to"],
+                       "Season (leave empty for all year)"),
+    ]
+
+    def on_model_change(self, form, model, is_created):
+        if model.start_time is None:
+            raise ValueError("A guided visit needs a start time")
+        if model.weekday is None and model.month is None and not model.holidays:
+            raise ValueError("Pick when it runs: a weekday, an annual date, or public holidays")
+        if model.month_from is not None and (model.day_from is None or model.day_to is None):
+            raise ValueError("A season needs first and last days as well as months")
+        super().on_model_change(form, model, is_created)
 
 
 class LanguageView(BaseView):

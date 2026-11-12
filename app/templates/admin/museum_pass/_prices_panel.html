@@ -1,0 +1,145 @@
+{# Pass-price editor, included under the pass edit form.
+   Context: model (the pass), return_url, and the prices_* variables from prices_context(). #}
+
+{% macro audience_block(i, r) %}
+<div class="card mb-3">
+  <div class="card-body">
+    <button type="button" class="btn btn-sm btn-outline-danger float-right" onclick="this.closest('.card').remove()">Remove</button>
+    <div class="row">
+      <div class="col-md-3">
+        <label>Who is it for?</label>
+        <input class="form-control" name="rows-{{ i }}-label" value="{{ r.label }}" placeholder="Adult">
+      </div>
+      <div class="col-md-4">
+        <label>Prices</label>
+        <input class="form-control" name="rows-{{ i }}-prices" value="{{ r.prices }}" placeholder="31 / 51 / 62">
+      </div>
+      <div class="col-md-5">
+        <label>Notes</label>
+        <input class="form-control" name="rows-{{ i }}-notes" value="{{ r.notes }}">
+      </div>
+    </div>
+    <div class="row mt-2 align-items-end">
+      <div class="col-auto">
+        <label>Min age</label>
+        <input type="number" min="0" class="form-control" name="rows-{{ i }}-min_age" value="{{ r.min_age }}" style="width:6rem">
+      </div>
+      <div class="col-auto">
+        <label>Max age</label>
+        <input type="number" min="0" class="form-control" name="rows-{{ i }}-max_age" value="{{ r.max_age }}" style="width:6rem">
+      </div>
+      <div class="col-auto pb-2">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="rows-{{ i }}-student" value="1" id="rows-{{ i }}-student" {% if r.student %}checked{% endif %}>
+          <label class="form-check-label" for="rows-{{ i }}-student">Students</label>
+        </div>
+      </div>
+      <div class="col-auto">
+        <label>Country (2 letters)</label>
+        <input class="form-control" name="rows-{{ i }}-country" value="{{ r.country }}" maxlength="2" style="width:6rem">
+      </div>
+      <div class="col-auto">
+        <label>Municipality</label>
+        <input class="form-control" name="rows-{{ i }}-municipality" value="{{ r.municipality }}">
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+<h3>Prices</h3>
+
+<h4>Current prices</h4>
+{% if prices_existing %}
+<form method="post" action="{{ get_url('.prices_view', pass_id=model.id) }}">
+  {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+  <input type="hidden" name="return_url" value="{{ return_url }}">
+
+  <table class="table table-striped table-bordered">
+    <thead><tr><th></th><th>Who</th><th>Duration</th><th>Price</th><th>Notes</th></tr></thead>
+    <tbody>
+      {% for e in prices_existing %}
+      <tr>
+        <td><input type="checkbox" name="selected" value="{{ e.id }}"></td>
+        <td>{{ e.text.label }}{% if e.text.who %} · <span class="text-muted">{{ e.text.who }}</span>{% endif %}</td>
+        <td>{{ e.text.duration }}</td>
+        <td>{{ e.text.price }}</td>
+        <td>{{ e.text.notes }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h5>Change the selected rows</h5>
+  <p class="text-muted">Fill in only what should change. Use a new price or a percentage (e.g. 5 or -10), not both.</p>
+  <div class="row">
+    <div class="col-auto"><label>New price</label><input class="form-control" name="bulk_price"></div>
+    <div class="col-auto"><label>Change by %</label><input class="form-control" name="bulk_percent"></div>
+    <div class="col-md-4"><label>Notes</label><input class="form-control" name="bulk_notes"></div>
+  </div>
+  <div class="mt-2">
+    <button type="submit" name="action" value="bulk_update" class="btn btn-primary">Apply to selected</button>
+    <button type="submit" name="action" value="delete" class="btn btn-danger" onclick="return confirm('Delete selected prices?')">Delete selected</button>
+  </div>
+</form>
+{% else %}
+<p class="text-muted">No prices yet. Add some below.</p>
+{% endif %}
+
+<hr>
+
+<h4>Add prices</h4>
+<p class="text-muted">
+  List the durations once, then add one line per audience with a price for each duration, in the same order,
+  separated by /. Example: durations <code>24h, 48h, 72h</code> and prices <code>31 / 51 / 62</code>.
+  Use Preview to check the rows before saving.
+</p>
+
+<form id="prices-form" method="post" data-url="{{ get_url('.prices_view', pass_id=model.id) }}">
+  {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+  <input type="hidden" name="return_url" value="{{ return_url }}">
+
+  <div class="row mb-3">
+    <div class="col-md-6">
+      <label>Durations</label>
+      <input class="form-control" name="durations" value="{{ prices_durations }}" placeholder="24h, 48h, 72h  or  1 day  or  1 year">
+    </div>
+    <div class="col-auto">
+      <label>Currency</label>
+      <input class="form-control" name="currency" value="{{ prices_currency }}" maxlength="3" style="width:6rem">
+    </div>
+  </div>
+
+  <div id="prices-rows">
+    {% for r in prices_rows %}{{ audience_block(loop.index0, r) }}{% endfor %}
+  </div>
+  <button type="button" class="btn btn-secondary mb-3" onclick="addRow()">+ Add another audience</button>
+
+  <div id="prices-preview"></div>
+
+  <button type="button" class="btn btn-info" onclick="sendPrices('preview')">Preview</button>
+  <button type="button" class="btn btn-success" onclick="sendPrices('save')">Save prices</button>
+</form>
+
+<div id="blank-row-template" style="display: none;">{{ audience_block("__i__", prices_blank) }}</div>
+
+<script>
+let rowIndex = {{ prices_rows|length }};
+
+function addRow() {
+  const html = document.getElementById('blank-row-template').innerHTML.replace(/__i__/g, rowIndex++);
+  document.getElementById('prices-rows').insertAdjacentHTML('beforeend', html);
+}
+
+function sendPrices(action) {
+  const form = document.getElementById('prices-form');
+  const data = new FormData(form);
+  data.append('action', action);
+  fetch(form.dataset.url, { method: 'POST', body: data })
+    .then(r => r.json())
+    .then(d => {
+      if (d.saved) { location.reload(); }
+      else { document.getElementById('prices-preview').innerHTML = d.html; }
+    });
+}
+</script>

@@ -1,0 +1,6 @@
+{% extends 'admin/model/edit.html' %}
+
+{% block edit_form %}
+  {{ super() }}
+  {% include 'admin/museum_pass/_prices_panel.html' %}
+{% endblock %}
