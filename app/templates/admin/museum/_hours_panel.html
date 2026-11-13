@@ -1,74 +1,84 @@
 {# Opening-hours editor, included under the museum edit form.
    Context: model (the museum), return_url, and the hours_* variables from hours_context(). #}
 
+{% macro date_row(i, month, day) %}
+<div class="form-row align-items-center mb-2 date-row">
+    <div class="col-auto">
+        <select class="form-control" name="rules-{{ i }}-month">
+            <option value="">Month</option>
+            {% for m in hours_months %}
+                <option value="{{ loop.index }}" {% if month == loop.index|string %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <input type="number" class="form-control" style="width:6rem" name="rules-{{ i }}-day" value="{{ day }}" min="1" max="31" placeholder="Day">
+    </div>
+    <div class="col-auto">
+        <button type="button" class="btn btn-sm btn-outline-danger" title="Remove this date" onclick="removeDate(this)">&times;</button>
+    </div>
+</div>
+{% endmacro %}
+
 {% macro rule_block(i, r) %}
 <div class="card mb-3">
     <div class="card-body">
         <button type="button" class="btn btn-sm btn-outline-danger float-right" onclick="this.closest('.card').remove()">Remove</button>
-        
+
         <h5>Rule</h5>
-        
+
         {# Type #}
         <div class="form-group">
             <label>Type</label>
-            <select class="form-control" name="rules-{{ i }}-kind">
+            <select class="form-control" name="rules-{{ i }}-kind" onchange="syncKind(this)">
                 <option value="weekly" {% if r.kind == 'weekly' %}selected{% endif %}>Weekdays</option>
                 <option value="date" {% if r.kind == 'date' %}selected{% endif %}>Annual date (e.g. 25 December)</option>
                 <option value="holidays" {% if r.kind == 'holidays' %}selected{% endif %}>Public holidays</option>
             </select>
         </div>
 
-        {# Weekdays (if weekly) #}
-        {% if r.kind == 'weekly' or i == '__i__' %}
-        <div class="form-group">
-            <label>Which days?</label>
-            <div class="d-flex flex-wrap">
-                {% for d in hours_weekdays %}
-                <div class="form-check form-check-inline mr-3">
-                    <input class="form-check-input" type="checkbox" name="rules-{{ i }}-days" value="{{ loop.index0 }}" id="rules-{{ i }}-days-{{ loop.index0 }}" {% if loop.index0|string in r.days %}checked{% endif %}>
-                    <label class="form-check-label" for="rules-{{ i }}-days-{{ loop.index0 }}">{{ d[:3] }}</label>
+        {# Weekdays #}
+        <div class="rule-weekly">
+            <div class="form-group">
+                <label>Which days?</label>
+                <div class="d-flex flex-wrap">
+                    {% for d in hours_weekdays %}
+                    <div class="form-check form-check-inline mr-3">
+                        <input class="form-check-input" type="checkbox" name="rules-{{ i }}-days" value="{{ loop.index0 }}" id="rules-{{ i }}-days-{{ loop.index0 }}" {% if loop.index0|string in r.days %}checked{% endif %}>
+                        <label class="form-check-label" for="rules-{{ i }}-days-{{ loop.index0 }}">{{ d[:3] }}</label>
+                    </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '1,2,3,4,5')">Mon–Fri</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '1,2,3,4,5,6')">Tue–Sun</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '5,6')">Weekend</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '0,1,2,3,4,5,6')">Every day</button>
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="setDays(this, '')">Clear days</button>
+                </div>
             </div>
-            <div class="mt-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '1,2,3,4,5')">Mon–Fri</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '1,2,3,4,5,6')">Tue–Sun</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '5,6')">Weekend</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '0,1,2,3,4,5,6')">Every day</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setDays(this, '')">Clear</button>
-            </div>
-        </div>
 
-        <div class="form-group">
-            <label>Which week of the month?</label>
-            <select class="form-control" name="rules-{{ i }}-week_of_month">
-                <option value="">Every week</option>
-                {% for key, name in hours_ordinals.items() %}
-                    <option value="{{ key }}" {% if r.week_of_month == key|string %}selected{% endif %}>{{ name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-
-        {# Date (if date) #}
-        {% if r.kind == 'date' %}
-        <div class="row">
-            <div class="col-auto">
-                <label>Month</label>
-                <select class="form-control" name="rules-{{ i }}-month">
-                    {% for m in hours_months %}
-                        <option value="{{ loop.index }}" {% if r.month == loop.index|string %}selected{% endif %}>{{ m }}</option>
+            <div class="form-group">
+                <label>Which week of the month?</label>
+                <select class="form-control" name="rules-{{ i }}-week_of_month">
+                    <option value="">Every week</option>
+                    {% for key, name in hours_ordinals.items() %}
+                        <option value="{{ key }}" {% if r.week_of_month == key|string %}selected{% endif %}>{{ name }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-auto">
-                <label>Day</label>
-                <input type="number" class="form-control" name="rules-{{ i }}-day" value="{{ r.day }}" min="1" max="31">
-            </div>
         </div>
-        {% endif %}
 
-        {# --- HOURS AND CLOSED (SAME ROW) --- #}
+        {# Annual dates: one or more, same hours for all #}
+        <div class="rule-date form-group">
+            <label>Which dates?</label>
+            <div class="date-rows">
+                {% for d in (r.dates or [('', '')]) %}{{ date_row(i, d[0], d[1]) }}{% endfor %}
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addDate(this)">+ Add date</button>
+        </div>
+
+        {# --- HOURS AND CLOSED (all types) --- #}
         <div class="row align-items-end mt-3">
             <div class="col-auto pb-2">
                 <div class="form-check">
@@ -90,43 +100,45 @@
             </div>
         </div>
 
-        {# --- YEARLY PERIOD (ALWAYS VISIBLE + CHECKBOX) --- #}
-        <div class="form-check mt-4">
-            <input class="form-check-input" type="checkbox" name="rules-{{ i }}-has_period" value="1" id="rules-{{ i }}-has_period" {% if r.month_from %}checked{% endif %} onchange="togglePeriod(this)">
-            <label class="form-check-label font-weight-bold" for="rules-{{ i }}-has_period">Only during part of the year</label>
+        {# --- YEARLY PERIOD (weekdays only) --- #}
+        <div class="rule-weekly">
+            <div class="form-check mt-4">
+                <input class="form-check-input" type="checkbox" name="rules-{{ i }}-has_period" value="1" id="rules-{{ i }}-has_period" {% if r.month_from %}checked{% endif %} onchange="togglePeriod(this)">
+                <label class="form-check-label font-weight-bold" for="rules-{{ i }}-has_period">Only during part of the year</label>
+            </div>
+            <div class="row mt-2">
+                <div class="col-auto">
+                    <label>From</label>
+                    <select class="form-control" name="rules-{{ i }}-month_from">
+                        <option value="">Month</option>
+                        {% for m in hours_months %}
+                            <option value="{{ loop.index }}" {% if r.month_from == loop.index|string %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label>Day</label>
+                    <input type="number" class="form-control" name="rules-{{ i }}-day_from" value="{{ r.day_from }}" min="1" max="31" placeholder="Day">
+                </div>
+                <div class="col-auto align-self-end pt-4">—</div>
+                <div class="col-auto">
+                    <label>To</label>
+                    <select class="form-control" name="rules-{{ i }}-month_to">
+                        <option value="">Month</option>
+                        {% for m in hours_months %}
+                            <option value="{{ loop.index }}" {% if r.month_to == loop.index|string %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label>Day</label>
+                    <input type="number" class="form-control" name="rules-{{ i }}-day_to" value="{{ r.day_to }}" min="1" max="31" placeholder="Day">
+                </div>
+            </div>
+            <small class="form-text text-muted">(each year; can't cross 1 January)</small>
         </div>
-        <div class="row mt-2">
-            <div class="col-auto">
-                <label>From</label>
-                <select class="form-control" name="rules-{{ i }}-month_from">
-                    <option value="">Month</option>
-                    {% for m in hours_months %}
-                        <option value="{{ loop.index }}" {% if r.month_from == loop.index|string %}selected{% endif %}>{{ m }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-auto">
-                <label>Day</label>
-                <input type="number" class="form-control" name="rules-{{ i }}-day_from" value="{{ r.day_from }}" min="1" max="31" placeholder="Day">
-            </div>
-            <div class="col-auto align-self-end pt-4">—</div>
-            <div class="col-auto">
-                <label>To</label>
-                <select class="form-control" name="rules-{{ i }}-month_to">
-                    <option value="">Month</option>
-                    {% for m in hours_months %}
-                        <option value="{{ loop.index }}" {% if r.month_to == loop.index|string %}selected{% endif %}>{{ m }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-auto">
-                <label>Day</label>
-                <input type="number" class="form-control" name="rules-{{ i }}-day_to" value="{{ r.day_to }}" min="1" max="31" placeholder="Day">
-            </div>
-        </div>
-        <small class="form-text text-muted">(each year; can't cross 1 January)</small>
 
-        {# --- LABEL, NOTES, SPECIAL HOURS (ALWAYS VISIBLE) --- #}
+        {# --- LABEL AND NOTES (all types) --- #}
         <div class="row mt-4">
             <div class="col-md-4">
                 <label>Label</label>
@@ -137,7 +149,9 @@
                 <input type="text" class="form-control" name="rules-{{ i }}-notes" value="{{ r.notes }}" placeholder="Notes">
             </div>
         </div>
-        <div class="form-check mt-2">
+
+        {# Dates and holidays are sorted into "special" or "closures" by the page itself; only weekdays need the flag #}
+        <div class="form-check mt-2 rule-weekly">
             <input class="form-check-input" type="checkbox" name="rules-{{ i }}-is_special" value="1" id="rules-{{ i }}-is_special" {% if r.is_special %}checked{% endif %}>
             <label class="form-check-label" for="rules-{{ i }}-is_special">Special hours (listed apart from the regular weekly table)</label>
         </div>
@@ -280,8 +294,33 @@ function setDays(btn, daysStr) {
     });
 }
 
+// Show only the sections that belong to the chosen rule type.
+function syncKind(select) {
+    const card = select.closest('.card');
+    const kind = select.value;
+    card.querySelectorAll('.rule-weekly').forEach(el => el.classList.toggle('d-none', kind !== 'weekly'));
+    card.querySelectorAll('.rule-date').forEach(el => el.classList.toggle('d-none', kind !== 'date'));
+}
+
+function addDate(btn) {
+    const container = btn.closest('.rule-date').querySelector('.date-rows');
+    const clone = container.querySelector('.date-row').cloneNode(true);
+    clone.querySelectorAll('select, input').forEach(el => el.value = '');
+    container.appendChild(clone);
+}
+
+function removeDate(btn) {
+    const row = btn.closest('.date-row');
+    if (btn.closest('.date-rows').querySelectorAll('.date-row').length > 1) {
+        row.remove();
+    } else {
+        row.querySelectorAll('select, input').forEach(el => el.value = '');  // keep one empty row
+    }
+}
+
 // Initialize states on page load for existing rules
 document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#hours-rules-container select[name$="-kind"]').forEach(s => syncKind(s));
     document.querySelectorAll('input[type="checkbox"][name$="-closed"]').forEach(cb => toggleClosed(cb));
     document.querySelectorAll('input[type="checkbox"][name$="-has_period"]').forEach(cb => togglePeriod(cb));
 });
@@ -298,8 +337,10 @@ function addRule() {
     const newCard = document.getElementById('hours-rules-container').lastElementChild;
     const closedCb = newCard.querySelector('input[name$="-closed"]');
     const periodCb = newCard.querySelector('input[name$="-has_period"]');
+    const kindSelect = newCard.querySelector('select[name$="-kind"]');
     if (closedCb) toggleClosed(closedCb);
     if (periodCb) togglePeriod(periodCb);
+    if (kindSelect) syncKind(kindSelect);
 }
 
 function previewHours() {

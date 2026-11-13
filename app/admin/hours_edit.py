@@ -20,6 +20,7 @@ from calendar import month_name, monthrange
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import time
+from itertools import zip_longest
 
 from ..models import OpeningHours
 from ..museums.hours import WEEKDAYS, _fmt_hours, rule_text
@@ -52,8 +53,7 @@ class RuleInput:
     kind: str = "weekly"                  # "weekly" | "date" | "holidays"
     days: list[str] = field(default_factory=list)   # weekday numbers, "0" = Monday
     week_of_month: str = ""               # "", "1".."5", "-1" (last)
-    month: str = ""                       # kind == "date"
-    day: str = ""
+    dates: list[tuple[str, str]] = field(default_factory=list)  # kind == "date": (month, day) pairs
     closed: bool = False
     start_time: str = ""
     end_time: str = ""
@@ -86,11 +86,14 @@ def parse_rules(form) -> list[RuleInput]:
         def get(name, i=i):
             return form.get(f"rules-{i}-{name}", "").strip()
 
+        pairs = zip_longest(form.getlist(f"rules-{i}-month"), form.getlist(f"rules-{i}-day"), fillvalue="")
+        dates = [(m.strip(), d.strip()) for m, d in pairs if m.strip() or d.strip()]
+
         rule = RuleInput(
             kind=get("kind") or "weekly",
             days=form.getlist(f"rules-{i}-days"),
             week_of_month=get("week_of_month"),
-            month=get("month"), day=get("day"),
+            dates=dates,
             closed=bool(form.get(f"rules-{i}-closed")),
             start_time=get("start_time"), end_time=get("end_time"), last_entry=get("last_entry"),
             month_from=get("month_from"), day_from=get("day_from"),
@@ -128,6 +131,23 @@ def _int(value, label, errors, low, high):
     return number
 
 
+def _period(rule: RuleInput, errors: list):
+    """The optional yearly period of a weekly rule: (month_from, day_from, month_to, day_to)."""
+    month_from = _int(rule.month_from, "Period: first month", errors, 1, 12)
+    month_to = _int(rule.month_to, "Period: last month", errors, 1, 12)
+    day_from = _int(rule.day_from, "Period: first day", errors, 1, 31)
+    day_to = _int(rule.day_to, "Period: last day", errors, 1, 31)
+    if (month_from is None) != (month_to is None):
+        errors.append("A period needs both a first and a last month")
+    elif month_from is not None and month_from > month_to:
+        errors.append("A period can't wrap the new year: use two rules (e.g. Nov-Dec and Jan-Mar)")
+    if (day_from is None) != (day_to is None):
+        errors.append("Period days: fill in both or neither")
+    if day_from is not None and month_from is None:
+        errors.append("Period days need a first and last month")
+    return month_from, day_from, month_to, day_to
+
+
 def _expand_rule(rule: RuleInput, errors: list):
     """One rule -> list of column-value dicts (one per row). Appends to errors."""
     # Times
@@ -145,19 +165,12 @@ def _expand_rule(rule: RuleInput, errors: list):
         if last is not None and not start <= last <= end:
             errors.append("Last entry must be between the start and end time")
 
-    # Yearly period (same rules as the CheckConstraints: no wrapping over 1 Jan)
-    month_from = _int(rule.month_from, "Period: first month", errors, 1, 12)
-    month_to = _int(rule.month_to, "Period: last month", errors, 1, 12)
-    day_from = _int(rule.day_from, "Period: first day", errors, 1, 31)
-    day_to = _int(rule.day_to, "Period: last day", errors, 1, 31)
-    if (month_from is None) != (month_to is None):
-        errors.append("A period needs both a first and a last month")
-    elif month_from is not None and month_from > month_to:
-        errors.append("A period can't wrap the new year: use two rules (e.g. Nov-Dec and Jan-Mar)")
-    if (day_from is None) != (day_to is None):
-        errors.append("Period days: fill in both or neither")
-    if day_from is not None and month_from is None:
-        errors.append("Period days need a first and last month")
+    # Only the fields of the chosen kind are read; the rest are ignored.
+    # A yearly period only makes sense for weekday rules.
+    if rule.kind == "weekly":
+        month_from, day_from, month_to, day_to = _period(rule, errors)
+    else:
+        month_from = day_from = month_to = day_to = None
 
     # Which rows does the rule create?
     targets: list[dict] = []
@@ -171,14 +184,20 @@ def _expand_rule(rule: RuleInput, errors: list):
             errors.append("Pick at least one weekday")
         targets = [{"weekday": d, "week_of_month": week} for d in sorted(days)]
     elif rule.kind == "date":
-        month = _int(rule.month, "Month", errors, 1, 12)
-        day = _int(rule.day, "Day", errors, 1, 31)
-        if month is None or day is None:
-            errors.append("Pick a month and a day")
-        elif day > monthrange(2024, month)[1]:   # 2024: a leap year, so 29 Feb is allowed
-            errors.append("That month doesn't have that many days")
-        else:
-            targets = [{"month": month, "day": day}]
+        if not rule.dates:
+            errors.append("Add at least one date")
+        found = []
+        for n, (month_text, day_text) in enumerate(rule.dates, start=1):
+            where = f"Date {n}: " if len(rule.dates) > 1 else ""
+            month = _int(month_text, f"{where}Month", errors, 1, 12)
+            day = _int(day_text, f"{where}Day", errors, 1, 31)
+            if month is None or day is None:
+                errors.append(f"{where}Pick a month and a day")
+            elif day > monthrange(2024, month)[1]:   # 2024: a leap year, so 29 Feb is allowed
+                errors.append(f"{where}That month doesn't have that many days")
+            else:
+                found.append((month, day))
+        targets = [{"month": m, "day": d} for m, d in dict.fromkeys(found)]  # same date twice = once
     elif rule.kind == "holidays":
         targets = [{"holidays": True}]
     else:
@@ -191,7 +210,7 @@ def _expand_rule(rule: RuleInput, errors: list):
         start_time=None if rule.closed else start,
         end_time=None if rule.closed else end,
         last_entry=None if rule.closed else last,
-        is_special=rule.is_special,
+        is_special=rule.is_special and rule.kind == "weekly",   # dates/holidays are sorted by the page anyway
         label=rule.label or None,
         notes=rule.notes or None,
     )
