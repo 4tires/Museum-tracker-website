@@ -320,6 +320,10 @@ class LanguageView(BaseView):
     column_searchable_list = ("code", "name")
     form_excluded_columns = ("guided_visits",)
 
+class PaymentMethodView(BaseView):
+    column_searchable_list = ("code", "name")
+    form_excluded_columns = ("museums",)
+
 
 # --- Community data: mostly read-only, for moderation ---------------------
 
@@ -380,6 +384,7 @@ admin.add_view(MuseumPassView(models.MuseumPass, db.session, name="Passes", cate
 admin.add_view(AudioguideView(models.Audioguide, db.session, category="Catalogue"))
 admin.add_view(GuidedVisitView(models.GuidedVisit, db.session, name="Guided visits", category="Catalogue"))
 admin.add_view(LanguageView(models.Language, db.session, category="Catalogue"))
+admin.add_view(PaymentMethodView(models.PaymentMethod, db.session, name="Payment methods", category="Catalogue"))
 
 admin.add_view(MuseumReviewView(models.MuseumReview, db.session, name="Museum reviews", category="Community"))
 admin.add_view(ExhibitionReviewView(models.ExhibitionReview, db.session, name="Exhibition reviews", category="Community"))

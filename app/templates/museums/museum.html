@@ -35,6 +35,12 @@
           {{ "Available" if museum.has_lockers else "Not available" }}{{ note(museum.locker_notes) }}
         </dd>
         {% endif %}
+        {% if museum.payment_methods %}
+        <dt>Payment</dt>
+        <dd>
+          {{ museum.payment_methods | map(attribute="name") | sort | join(", ") }}{{ note(museum.payment_notes) }}
+        </dd>
+        {% endif %}
       </dl>
       </div>
     </header>

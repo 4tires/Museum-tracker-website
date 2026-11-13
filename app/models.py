@@ -72,6 +72,7 @@ class Museum(db.Model):
     address: Mapped[str] = mapped_column(String(254))
     has_lockers: Mapped[Optional[bool]]          # None = unknown, False = confirmed no
     locker_notes: Mapped[Optional[str]]          # size limits, coin/deposit, large luggage
+    payment_notes: Mapped[Optional[str]] = mapped_column(Text)   # exceptions, e.g. "Card only above €5"
 
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc)
@@ -107,11 +108,39 @@ class Museum(db.Model):
     # Languages of the museum's display texts (uses the museum_language table below)
     languages: Mapped[list["Language"]] = relationship(secondary="museum_language")
 
+    payment_methods: Mapped[list["PaymentMethod"]] = relationship(
+        secondary="museum_payment_method", back_populates="museums"
+    )
+
     def __repr__(self) -> str:
         return f"Museum(id={self.id!r}, name={self.name!r}, city={self.city!r})"
 
     def __str__(self) -> str:
         return f"{self.name} ({self.city})"
+
+class PaymentMethod(db.Model):
+    __tablename__ = "payment_methods"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True)   # "cash", "mbway"
+    name: Mapped[str] = mapped_column(String(50))                # "MB Way"
+
+    museums: Mapped[list["Museum"]] = relationship(
+        secondary="museum_payment_method", back_populates="payment_methods"
+    )
+
+    def __repr__(self) -> str:
+        return f"PaymentMethod(id={self.id!r}, code={self.code!r})"
+
+    def __str__(self) -> str:
+        return self.name
+
+museum_payment_method = Table(
+    "museum_payment_method",
+    db.metadata,
+    Column("museum_id", ForeignKey("museum.id", ondelete="CASCADE"), primary_key=True),
+    Column("payment_method_id", ForeignKey("payment_methods.id", ondelete="CASCADE"), primary_key=True),
+)
 
 class MuseumVisit(db.Model):
     __tablename__ = "museum_visits"

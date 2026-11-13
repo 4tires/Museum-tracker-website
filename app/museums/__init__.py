@@ -10,6 +10,7 @@ from .hours import build_opening_hours
 from .tickets import build_tickets
 from .visitor_info import build_audioguides, build_guided_visits, duration_text
 
+
 bp = Blueprint("museums", __name__)
 
 @bp.route("/")
@@ -43,6 +44,8 @@ def _load_museum(museum_id):
             selectinload(Museum.tickets)
             .selectinload(Ticket.museum_pass)
             .selectinload(MuseumPass.prices),
+            selectinload(Museum.languages),
+            selectinload(Museum.payment_methods),
         ],
     )
 
