@@ -14,7 +14,6 @@ so the admin sees a specific message ("Standard already exists for all year")
 instead of an IntegrityError.
 """
 
-import json
 import re
 from calendar import monthrange
 from dataclasses import dataclass, field
@@ -22,8 +21,6 @@ from datetime import date, time
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from types import SimpleNamespace
 from typing import Optional
-
-from werkzeug.datastructures import MultiDict
 
 from ..models import DurationUnit, EntryPolicy, Validity
 from ..museums.exhibitions import exhibition_sort_key, is_archived
@@ -480,68 +477,6 @@ def plan_ticket(form, *, museum_id, tickets, exhibitions, passes, today: date,
         plan.warnings.append(
             "No current exhibition is selected, so visitors won't see this ticket on the museum page."
         )
-    return plan
-
-
-def plan_ticket_batch(form, *, museum_id, tickets, exhibitions, passes, today: date) -> Plan:
-    """Plan several tickets with shared rules and per-ticket audience/price fields."""
-    errors = []
-    try:
-        ticket_rows = json.loads(form.get("ticket_rows", "[]"))
-    except (TypeError, ValueError):
-        return Plan(errors=["The ticket rows could not be read. Please try again."])
-
-    if not isinstance(ticket_rows, list) or not ticket_rows:
-        return Plan(errors=["Add at least one ticket row."])
-
-    if len(ticket_rows) > 100:
-        return Plan(errors=["Create at most 100 tickets in one batch."])
-
-    plan = Plan()
-    used = set()
-    for index, row in enumerate(ticket_rows, start=1):
-        if not isinstance(row, dict):
-            errors.append(f"Ticket row {index} is invalid.")
-            continue
-
-        values = MultiDict(form.items(multi=True))
-        for field_name in (
-            "label", "pass_id", "min_age", "max_age",
-            "resident_country", "resident_municipality",
-        ):
-            values.setlist(field_name, [str(row.get(field_name, "") or "")])
-        values.setlist("is_student", ["1"] if row.get("is_student") else [])
-        values.setlist("seasons-0-price", [str(row.get("price", "") or "")])
-
-        row_plan = plan_ticket(
-            values, museum_id=museum_id, tickets=tickets, exhibitions=exhibitions,
-            passes=passes, today=today,
-        )
-        errors.extend(f"Ticket {index}: {message}" for message in row_plan.errors)
-        if row_plan.errors:
-            continue
-
-        for planned in row_plan.rows:
-            period = (
-                planned.values["month_from"], planned.values["day_from"],
-                planned.values["month_to"], planned.values["day_to"],
-            )
-            key = (planned.values["label"], period)
-            if key in used:
-                errors.append(
-                    f'Ticket {index}: "{planned.values["label"]}" is repeated for '
-                    f'{_season_text(period).lower()} in this batch.'
-                )
-            used.add(key)
-            plan.rows.append(planned)
-
-        if row_plan.exhibitions:
-            plan.exhibitions = row_plan.exhibitions
-        plan.warnings.extend(row_plan.warnings)
-
-    plan.errors = errors
-    if errors:
-        plan.rows = []
     return plan
 
 
