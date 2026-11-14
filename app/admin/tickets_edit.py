@@ -617,6 +617,139 @@ def plan_price_change(tickets, mode: str, raw: str) -> tuple[list[PriceChange], 
     return changes, errors
 
 
+# Groups of fields the bulk editor can change. A group is applied only when it is ticked;
+# everything else on each ticket (including its price) stays as it is.
+# group -> form field names (what parse_ticket_form reads)
+BULK_FORM_FIELDS = {
+    "label": ("label",),
+    "pass": ("pass_id",),
+    "currency": ("currency",),
+    "notes": ("notes",),
+    "entry": ("entry_policy",),
+    "validity": ("validity", "validity_value", "validity_unit"),
+    "audience": ("min_age", "max_age", "resident_country", "resident_municipality", "is_student"),
+    "schedule": ("schedule_kind", "weekday", "week_of_month", "month", "day", "start_time", "end_time"),
+    "period": ("month_from", "day_from", "month_to", "day_to"),
+}
+# group -> Ticket columns it writes
+BULK_COLUMNS = {
+    "label": ("label",),
+    "pass": ("pass_id",),
+    "currency": ("currency",),
+    "notes": ("notes",),
+    "entry": ("entry_policy",),
+    "validity": ("validity", "validity_value", "validity_unit"),
+    "audience": ("min_age", "max_age", "resident_country", "resident_municipality", "is_student"),
+    "schedule": ("weekday", "week_of_month", "month", "day", "holidays", "start_time", "end_time"),
+    "period": ("month_from", "day_from", "month_to", "day_to"),
+}
+
+
+@dataclass
+class TicketEdit:
+    ticket: object
+    label: str
+    season: str
+    changes: list            # (what, old text, new text)
+    values: dict             # the columns to write
+
+
+def _ticket_form(t) -> MultiDict:
+    """A stored ticket as a submitted form, so it goes through the same checks as a typed one."""
+    base = MultiDict()
+    for key, value in form_values(t).items():
+        if key == "exhibition_ids":
+            for i in value:
+                base.add(key, str(i))
+        elif key == "season":
+            for name, v in value.items():
+                base[f"seasons-0-{name}"] = v
+        elif key == "is_student":
+            base[key] = "1" if value else ""
+        else:
+            base[key] = value
+    return base
+
+
+def plan_bulk_edit(form, selected, *, tickets, exhibitions, passes, today: date) -> tuple[list[TicketEdit], list[str]]:
+    """Change the ticked field groups on the selected tickets. Saves nothing; all or nothing."""
+    groups = [g for g in BULK_FORM_FIELDS if g in form.getlist("bulk_groups")]
+    if not groups:
+        return [], ["Tick what you want to change."]
+
+    pass_by_id = {p.id: p for p in passes}
+    problems: dict[str, list[str]] = {}
+    planned = []                                   # (ticket, all column values)
+    for t in selected:
+        base = _ticket_form(t)
+        for group in groups:
+            for name in BULK_FORM_FIELDS[group]:
+                target = f"seasons-0-{name}" if group == "period" else name
+                if name == "is_student":
+                    base[target] = "1" if form.get("set_is_student") else ""
+                else:
+                    base[target] = form.get(f"set_{name}", "")
+        parsed = parse_ticket_form(base, pass_ids=set(pass_by_id))
+        label = f'"{t.label}" ({_season_text(period_of(t)).lower()})'
+        for error in parsed.errors:
+            problems.setdefault(error, []).append(label)
+        if parsed.errors or len(parsed.seasons) != 1:
+            continue
+        season = parsed.seasons[0]
+        planned.append((t, {
+            **parsed.common, "price": t.price, "month_from": season.month_from,
+            "day_from": season.day_from, "month_to": season.month_to, "day_to": season.day_to,
+        }))
+
+    # Report each problem once; name the tickets only when it doesn't concern all of them.
+    errors = []
+    for message, names in problems.items():
+        if len(names) == len(selected):
+            errors.append(message)
+        else:
+            more = "…" if len(names) > 3 else ""
+            errors.append(f"{message} ({', '.join(names[:3])}{more})")
+    if errors:
+        return [], errors
+
+    # Same rule as plan_ticket: a label can be reused only for different periods.
+    selected_ids = {t.id for t in selected}
+    taken = {(t.label, period_of(t)) for t in tickets if t.id not in selected_ids}
+    for t, values in planned:
+        period = (values["month_from"], values["day_from"], values["month_to"], values["day_to"])
+        if (values["label"], period) in taken:
+            message = f'"{values["label"]}" would already exist for {_season_text(period).lower()}.'
+            if message not in errors:
+                errors.append(message)
+        taken.add((values["label"], period))
+    if errors:
+        return [], errors
+
+    edits = []
+    for t, values in planned:
+        columns = [c for g in groups for c in BULK_COLUMNS[g]]
+        new = {c: values[c] for c in columns}
+        if all(getattr(t, c) == new[c] for c in columns):
+            continue
+        shown = SimpleNamespace(**values, museum_pass=pass_by_id.get(values["pass_id"]))
+        before = row_view(t, t.exhibitions, exhibitions, today)
+        after = row_view(shown, t.exhibitions, exhibitions, today)
+        changes = []
+        old_season = _season_text(period_of(t))
+        new_season = _season_text((values["month_from"], values["day_from"], values["month_to"], values["day_to"]))
+        if old_season != new_season:
+            changes.append(("Season", old_season, new_season))
+        for what, attr in (("Ticket", "label"), ("Price", "price"), ("Who", "audience"),
+                           ("When", "when"), ("Terms", "terms"), ("Notes", "notes")):
+            old, now = getattr(before, attr), getattr(after, attr)
+            if old != now:
+                changes.append((what, old or "—", now or "—"))
+        edits.append(TicketEdit(t, t.label, old_season, changes, new))
+    if not edits:
+        return [], ["Nothing would change."]
+    return edits, []
+
+
 def change_exhibitions(tickets, mode: str, exhibitions: list) -> int:
     """Add, remove or replace linked exhibitions. Returns how many tickets changed."""
     changed = 0

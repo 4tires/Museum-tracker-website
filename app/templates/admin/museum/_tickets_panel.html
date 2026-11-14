@@ -40,7 +40,7 @@
   #tickets-panel { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ddd; }
   #tickets-panel .ticket-row td { vertical-align: middle; }
   #tickets-panel .ticket-group td { background: rgba(0, 0, 0, .05); }
-  #tickets-bulk { position: sticky; top: 0; z-index: 5; }
+  #tickets-bulk-form { position: sticky; top: 0; z-index: 5; max-height: 90vh; overflow-y: auto; }
   #ticket-modal details { margin-bottom: 1rem; }
   #ticket-modal summary { cursor: pointer; font-weight: 600; }
   #ticket-modal .season-row:first-child .season-remove { visibility: hidden; }
@@ -112,6 +112,158 @@
           <button type="button" class="btn btn-sm btn-primary" data-bulk="bulk_exhibitions">Apply</button>
         </div>
       </div>
+
+      {# Other fields: only the ticked groups are changed on the selected tickets. #}
+      <details class="mb-2" id="tickets-bulk-fields">
+        <summary>Change other fields</summary>
+        <p class="small text-muted mt-2 mb-1">Tick what to change; everything else stays as it is.</p>
+
+        <div class="bulk-group mb-2">
+          <label class="mb-1"><input type="checkbox" name="bulk_groups" value="label"> Label</label>
+          <div class="bulk-inputs form-row" hidden>
+            <div class="col-auto"><input class="form-control form-control-sm" name="set_label" maxlength="100" placeholder="e.g. Standard"></div>
+          </div>
+        </div>
+
+        <div class="bulk-group mb-2">
+          <label class="mb-1"><input type="checkbox" name="bulk_groups" value="period"> Season (dates)</label>
+          <div class="bulk-inputs form-row" hidden>
+            <div class="col-auto">
+              <div class="input-group input-group-sm">
+                <div class="input-group-prepend"><span class="input-group-text">From</span></div>
+                <input class="form-control" type="number" min="1" max="31" name="set_day_from" placeholder="day" style="max-width: 5rem">
+                <select class="form-control" name="set_month_from">
+                  <option value="">All year</option>
+                  {% for m in ticket_months %}<option value="{{ loop.index }}">{{ m }}</option>{% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-auto">
+              <div class="input-group input-group-sm">
+                <div class="input-group-prepend"><span class="input-group-text">To</span></div>
+                <input class="form-control" type="number" min="1" max="31" name="set_day_to" placeholder="day" style="max-width: 5rem">
+                <select class="form-control" name="set_month_to">
+                  <option value="">—</option>
+                  {% for m in ticket_months %}<option value="{{ loop.index }}">{{ m }}</option>{% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bulk-group mb-2">
+          <label class="mb-1"><input type="checkbox" name="bulk_groups" value="audience"> Who it is for</label>
+          <div class="bulk-inputs form-row align-items-center" hidden>
+            <div class="col-auto"><input class="form-control form-control-sm" type="number" min="0" name="set_min_age" placeholder="min. age" style="width: 6rem"></div>
+            <div class="col-auto"><input class="form-control form-control-sm" type="number" min="0" name="set_max_age" placeholder="max. age" style="width: 6rem"></div>
+            <div class="col-auto"><input class="form-control form-control-sm" name="set_resident_country" maxlength="2" placeholder="country" style="width: 6rem"></div>
+            <div class="col-auto"><input class="form-control form-control-sm" name="set_resident_municipality" placeholder="municipality"></div>
+            <div class="col-auto"><label class="mb-0"><input type="checkbox" name="set_is_student" value="1"> Student</label></div>
+          </div>
+        </div>
+
+        <div class="bulk-group mb-2">
+          <label class="mb-1"><input type="checkbox" name="bulk_groups" value="pass"> Museum pass</label>
+          <div class="bulk-inputs form-row" hidden>
+            <div class="col-auto">
+              <select class="form-control form-control-sm" name="set_pass_id">
+                <option value="">None</option>
+                {% for p in ticket_passes %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="bulk-group mb-2">
+          <label class="mb-1"><input type="checkbox" name="bulk_groups" value="schedule"> Days and times</label>
+          <div class="bulk-inputs form-row align-items-center" hidden>
+            <div class="col-auto">
+              <select class="form-control form-control-sm" name="set_schedule_kind">
+                <option value="always">Always</option>
+                <option value="weekday">On a weekday</option>
+                <option value="date">On a date every year</option>
+                <option value="holidays">On public holidays</option>
+              </select>
+            </div>
+            <div class="col-auto bulk-sch-weekday" hidden>
+              <select class="form-control form-control-sm" name="set_weekday">
+                <option value="">weekday</option>
+                {% for name in ticket_weekdays %}<option value="{{ loop.index0 }}">{{ name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-auto bulk-sch-weekday" hidden>
+              <select class="form-control form-control-sm" name="set_week_of_month">
+                <option value="">Every week</option>
+                {% for key, name in ticket_ordinals.items() %}<option value="{{ key }}">{{ name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-auto bulk-sch-date" hidden>
+              <select class="form-control form-control-sm" name="set_month">
+                <option value="">month</option>
+                {% for m in ticket_months %}<option value="{{ loop.index }}">{{ m }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-auto bulk-sch-date" hidden>
+              <input class="form-control form-control-sm" type="number" min="1" max="31" name="set_day" placeholder="day" style="width: 5rem">
+            </div>
+            <div class="col-auto"><input class="form-control form-control-sm" type="time" name="set_start_time" title="From"></div>
+            <div class="col-auto"><input class="form-control form-control-sm" type="time" name="set_end_time" title="Until"></div>
+          </div>
+        </div>
+
+        <div class="bulk-group mb-2">
+          <label class="mb-1"><input type="checkbox" name="bulk_groups" value="entry"> Entry</label>
+          <div class="bulk-inputs form-row" hidden>
+            <div class="col-auto">
+              <select class="form-control form-control-sm" name="set_entry_policy">
+                <option value="anytime">Anytime</option>
+                <option value="recommended">Booking recommended</option>
+                <option value="timed_slot">Timed slot required</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="bulk-group mb-2">
+          <label class="mb-1"><input type="checkbox" name="bulk_groups" value="validity"> Validity</label>
+          <div class="bulk-inputs form-row" hidden>
+            <div class="col-auto">
+              <select class="form-control form-control-sm" name="set_validity">
+                <option value="single_entry">A single entry</option>
+                <option value="same_day">The same day</option>
+                <option value="period">A period</option>
+              </select>
+            </div>
+            <div class="col-auto bulk-validity-period" hidden><input class="form-control form-control-sm" type="number" min="1" name="set_validity_value" placeholder="duration" style="width: 6rem"></div>
+            <div class="col-auto bulk-validity-period" hidden>
+              <select class="form-control form-control-sm" name="set_validity_unit">
+                <option value="">unit</option>
+                <option value="hours">hours</option>
+                <option value="days">days</option>
+                <option value="months">months</option>
+                <option value="years">years</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="bulk-group mb-2">
+          <label class="mb-1"><input type="checkbox" name="bulk_groups" value="currency"> Currency</label>
+          <div class="bulk-inputs form-row" hidden>
+            <div class="col-auto"><input class="form-control form-control-sm" name="set_currency" maxlength="3" value="EUR" style="width: 5rem"></div>
+          </div>
+        </div>
+
+        <div class="bulk-group mb-2">
+          <label class="mb-1"><input type="checkbox" name="bulk_groups" value="notes"> Notes</label>
+          <div class="bulk-inputs form-row" hidden>
+            <div class="col"><input class="form-control form-control-sm" name="set_notes" placeholder="empty clears the notes"></div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-sm btn-secondary" data-bulk="bulk_edit_preview">Preview</button>
+        <button type="button" class="btn btn-sm btn-primary" data-bulk="bulk_edit">Apply</button>
+      </details>
 
       <div>
         <button type="button" class="btn btn-sm btn-outline-danger" data-bulk="delete">Delete selected</button>
@@ -640,6 +792,22 @@
       }
       refreshBulk();
     });
+
+    // "Change other fields": show the inputs of a group once it is ticked, and only the
+    // inputs that matter for the chosen schedule / validity.
+    function syncBulkFields() {
+      bulk.querySelectorAll(".bulk-group").forEach(function (group) {
+        group.querySelector(".bulk-inputs").hidden = !group.querySelector('input[name="bulk_groups"]').checked;
+      });
+      var kind = bulk.elements.set_schedule_kind.value;
+      bulk.querySelectorAll(".bulk-sch-weekday").forEach(function (el) { el.hidden = kind !== "weekday"; });
+      bulk.querySelectorAll(".bulk-sch-date").forEach(function (el) { el.hidden = kind !== "date"; });
+      bulk.querySelectorAll(".bulk-validity-period").forEach(function (el) {
+        el.hidden = bulk.elements.set_validity.value !== "period";
+      });
+    }
+    bulk.addEventListener("change", syncBulkFields);
+    syncBulkFields();
 
     bulk.querySelectorAll("[data-bulk]").forEach(function (button) {
       button.addEventListener("click", function () {

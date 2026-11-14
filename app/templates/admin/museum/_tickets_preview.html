@@ -45,6 +45,28 @@
   {% endif %}
 {% endif %}
 
+{% if ticket_edits %}
+  <table class="table table-sm mb-2">
+    <thead><tr><th>Ticket</th><th>Season</th><th>Change</th></tr></thead>
+    <tbody>
+      {% for e in ticket_edits %}
+        <tr>
+          <td>{{ e.label }}</td>
+          <td class="text-muted">{{ e.season }}</td>
+          <td>
+            {% for what, old, new in e.changes %}
+              <div class="small"><span class="text-muted">{{ what }}:</span> {{ old }} &rarr; <strong>{{ new }}</strong></div>
+            {% endfor %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not errors %}
+    <p class="text-muted small mb-0">{{ ticket_edits | length }} ticket{{ 's' if ticket_edits | length != 1 }} would change. Press Apply to confirm.</p>
+  {% endif %}
+{% endif %}
+
 {% if price_changes %}
   <table class="table table-sm mb-2">
     <thead><tr><th>Ticket</th><th>Season</th><th class="text-right">Now</th><th class="text-right">New price</th></tr></thead>

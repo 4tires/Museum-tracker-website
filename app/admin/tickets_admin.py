@@ -25,7 +25,7 @@ from werkzeug.exceptions import abort
 
 from .. import models
 from .tickets_edit import (
-    EXHIBITION_MODES, change_exhibitions, plan_price_change, plan_ticket,
+    EXHIBITION_MODES, change_exhibitions, plan_bulk_edit, plan_price_change, plan_ticket,
     plan_ticket_batch, tickets_context,
 )
 
@@ -65,6 +65,8 @@ class MuseumTicketsMixin:
 
         if action in ("bulk_price_preview", "bulk_price"):
             return self._change_prices(selected, commit=(action == "bulk_price"))
+        if action in ("bulk_edit_preview", "bulk_edit"):
+            return self._edit_tickets(museum, selected, commit=(action == "bulk_edit"))
         if action == "bulk_exhibitions":
             return self._change_exhibitions(museum, selected)
         if action == "delete":
@@ -153,6 +155,25 @@ class MuseumTicketsMixin:
             flash(f"Changed the price of {len(changes)} ticket{'s' if len(changes) != 1 else ''}.")
             return self._reply(saved=True)
         return self._reply(price_changes=changes, errors=errors)
+
+    def _edit_tickets(self, museum, selected, commit: bool):
+        edits, errors = plan_bulk_edit(
+            request.form, selected, tickets=museum.tickets, exhibitions=museum.exhibitions,
+            passes=self._passes(), today=date.today(),
+        )
+        if commit and not errors:
+            for edit in edits:
+                for key, value in edit.values.items():
+                    setattr(edit.ticket, key, value)
+            try:
+                self.session.commit()
+            except IntegrityError as error:
+                self.session.rollback()
+                errors.append(f"The database rejected the change: {error.orig}")
+            else:
+                flash(f"Changed {len(edits)} ticket{'s' if len(edits) != 1 else ''}.")
+                return self._reply(saved=True)
+        return self._reply(ticket_edits=edits, errors=errors)
 
     def _change_exhibitions(self, museum, selected):
         mode = request.form.get("exhibition_mode", "")
