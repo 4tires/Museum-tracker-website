@@ -25,7 +25,8 @@ from werkzeug.exceptions import abort
 
 from .. import models
 from .tickets_edit import (
-    EXHIBITION_MODES, change_exhibitions, plan_price_change, plan_ticket, tickets_context,
+    EXHIBITION_MODES, change_exhibitions, plan_price_change, plan_ticket,
+    plan_ticket_batch, tickets_context,
 )
 
 
@@ -53,6 +54,8 @@ class MuseumTicketsMixin:
         action = request.form.get("action")
         if action in ("preview", "save"):
             return self._save_ticket(museum, commit=(action == "save"))
+        if action in ("batch_preview", "batch_save"):
+            return self._save_ticket_batch(museum, commit=(action == "batch_save"))
 
         # The other actions work on the ticked rows. Only this museum's tickets can be picked.
         wanted = set(request.form.getlist("selected", type=int))
@@ -102,6 +105,40 @@ class MuseumTicketsMixin:
                       f'Saved "{label}" with {len(plan.rows)} prices.')
                 return self._reply(saved=True)
         return self._reply(plan_rows=plan.rows, errors=plan.errors, warnings=plan.warnings)
+
+
+    def _save_ticket_batch(self, museum, commit: bool):
+        plan = plan_ticket_batch(
+            request.form, museum_id=museum.id, tickets=museum.tickets,
+            exhibitions=museum.exhibitions, passes=self._passes(), today=date.today(),
+        )
+        # Count submitted ticket definitions, rather than the expanded seasonal DB rows.
+        import json
+        try:
+            ticket_count = len(json.loads(request.form.get("ticket_rows", "[]")))
+        except (TypeError, ValueError):
+            ticket_count = 0
+
+        if commit and plan.can_save:
+            for row in plan.rows:
+                ticket = models.Ticket(museum_id=museum.id, **row.values)
+                self.session.add(ticket)
+                ticket.exhibitions = list(plan.exhibitions)
+            try:
+                self.session.commit()
+            except IntegrityError as error:
+                self.session.rollback()
+                plan.errors.append(f"The database rejected the ticket batch: {error.orig}")
+            else:
+                flash(
+                    f"Created {ticket_count} ticket{'s' if ticket_count != 1 else ''} "
+                    f"({len(plan.rows)} seasonal price{'s' if len(plan.rows) != 1 else ''})."
+                )
+                return self._reply(saved=True)
+        return self._reply(
+            plan_rows=plan.rows, errors=plan.errors, warnings=plan.warnings,
+            ticket_count=ticket_count,
+        )
 
     # --- several tickets at once -----------------------------------------------
 

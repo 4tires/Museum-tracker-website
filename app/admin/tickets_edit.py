@@ -14,6 +14,7 @@ so the admin sees a specific message ("Standard already exists for all year")
 instead of an IntegrityError.
 """
 
+import json
 import re
 from calendar import monthrange
 from dataclasses import dataclass, field
@@ -21,6 +22,8 @@ from datetime import date, time
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from types import SimpleNamespace
 from typing import Optional
+
+from werkzeug.datastructures import MultiDict
 
 from ..models import DurationUnit, EntryPolicy, Validity
 from ..museums.exhibitions import exhibition_sort_key, is_archived
@@ -478,6 +481,86 @@ def plan_ticket(form, *, museum_id, tickets, exhibitions, passes, today: date,
             "No current exhibition is selected, so visitors won't see this ticket on the museum page."
         )
     return plan
+
+
+# --- Creating several tickets from the same form -------------------------------
+
+def plan_ticket_batch(form, *, museum_id, tickets, exhibitions, passes, today: date) -> Plan:
+    """Plan one or more ticket definitions, sharing all non-row settings and seasons."""
+    raw_rows = form.get("ticket_rows", "")
+    try:
+        ticket_rows = json.loads(raw_rows)
+    except (TypeError, ValueError):
+        return Plan(errors=["The ticket rows could not be read. Please try again."])
+
+    if not isinstance(ticket_rows, list) or not ticket_rows:
+        return Plan(errors=["Add at least one ticket."])
+    if len(ticket_rows) > 100:
+        return Plan(errors=["You can create at most 100 tickets at once."])
+
+    season_indexes = sorted({
+        int(match.group(1))
+        for key in form
+        if (match := SEASON_KEY.match(key))
+    })
+    if not season_indexes:
+        return Plan(errors=["Add at least one season period."])
+
+    plan = Plan()
+    seen = set()
+
+    for index, item in enumerate(ticket_rows, start=1):
+        if not isinstance(item, dict):
+            plan.errors.append(f"Ticket {index}: invalid ticket row.")
+            continue
+
+        # Keep every shared field (including repeated exhibition_ids), then replace
+        # the fields that belong to this individual ticket.
+        row_form = MultiDict(form.items(multi=True))
+        row_form["label"] = str(item.get("label") or "")
+        row_form["pass_id"] = "" if item.get("pass_id") is None else str(item.get("pass_id"))
+        row_form["min_age"] = "" if item.get("min_age") is None else str(item.get("min_age"))
+        row_form["max_age"] = "" if item.get("max_age") is None else str(item.get("max_age"))
+        row_form["resident_country"] = "" if item.get("resident_country") is None else str(item.get("resident_country"))
+        row_form["resident_municipality"] = "" if item.get("resident_municipality") is None else str(item.get("resident_municipality"))
+        row_form["is_student"] = "1" if item.get("is_student") else ""
+
+        # A ticket's single price is applied to every shared season period.
+        row_price = "" if item.get("price") is None else str(item.get("price"))
+        for season_index in season_indexes:
+            row_form[f"seasons-{season_index}-price"] = row_price
+
+        row_plan = plan_ticket(
+            row_form, museum_id=museum_id, tickets=tickets, exhibitions=exhibitions,
+            passes=passes, today=today,
+        )
+        plan.exhibitions = row_plan.exhibitions
+
+        prefix = f"Ticket {index}"
+        label = str(item.get("label") or "").strip()
+        if label:
+            prefix += f' ("{label[:100]}")'
+        plan.errors.extend(f"{prefix}: {error}" for error in row_plan.errors)
+        plan.warnings.extend(f"{prefix}: {warning}" for warning in row_plan.warnings)
+
+        for planned in row_plan.rows:
+            key = (planned.values["label"], (
+                planned.values["month_from"], planned.values["day_from"],
+                planned.values["month_to"], planned.values["day_to"],
+            ))
+            if key in seen:
+                plan.errors.append(
+                    f'{prefix}: "{planned.values["label"]}" is duplicated in this batch '
+                    f'for {_season_text(key[1]).lower()}.'
+                )
+            seen.add(key)
+            plan.rows.append(planned)
+
+    # A batch is all-or-nothing: never let a partially valid batch be saved.
+    if plan.errors:
+        plan.rows.clear()
+    return plan
+
 
 
 # --- Changing several tickets at once -------------------------------------------

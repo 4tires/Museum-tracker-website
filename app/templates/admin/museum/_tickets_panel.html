@@ -3,7 +3,7 @@
 
 {% macro season_row(i) %}
   <div class="season-row form-row align-items-end mb-2">
-    <div class="form-group col-md-3 mb-0">
+    <div class="form-group col-md-3 mb-0 season-price-field">
       <label class="small mb-0">Price</label>
       <div class="input-group">
         <input class="form-control" name="seasons-{{ i }}-price" inputmode="decimal" placeholder="0.00" autocomplete="off">
@@ -44,6 +44,14 @@
   #ticket-modal details { margin-bottom: 1rem; }
   #ticket-modal summary { cursor: pointer; font-weight: 600; }
   #ticket-modal .season-row:first-child .season-remove { visibility: hidden; }
+  #ticket-modal .modal-dialog {
+    width: 96vw;
+    max-width: 1600px;
+  }
+  #ticket-modal .ticket-batch-table { min-width: 1250px; }
+  #ticket-modal .ticket-batch-table input,
+  #ticket-modal .ticket-batch-table select { min-width: 76px; }
+  #ticket-modal .ticket-batch-table th { white-space: nowrap; }
 </style>
 
 <section id="tickets-panel">
@@ -165,7 +173,7 @@
 
 {# One form for adding, editing and duplicating. Filled by script from tickets-data. #}
 <div class="modal fade" id="ticket-modal" tabindex="-1" role="dialog" aria-labelledby="ticket-modal-title" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
     <form class="modal-content" id="ticket-form" method="post" onsubmit="return false"
           data-url="{{ get_url('.tickets_view', museum_id=model.id) }}">
       {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
@@ -177,8 +185,8 @@
       </div>
 
       <div class="modal-body">
-        <div class="form-row">
-          <div class="form-group col-md-6">
+        <div class="form-row align-items-end">
+          <div class="form-group col-md-3" id="ticket-single-fields">
             <label>Ticket label</label>
             <input class="form-control" name="label" maxlength="100" autocomplete="off">
           </div>
@@ -186,7 +194,7 @@
             <label>Currency</label>
             <input class="form-control" name="currency" maxlength="3" value="EUR">
           </div>
-          <div class="form-group col-md-4">
+          <div class="form-group col-md-3" id="ticket-single-pass">
             <label>Museum pass</label>
             <select class="form-control" name="pass_id">
               <option value="">None</option>
@@ -195,41 +203,36 @@
           </div>
         </div>
 
+        <div id="ticket-batch-editor" hidden>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+              <h6 class="mb-0">Tickets to create</h6>
+              <p class="small text-muted mb-0">Each row is a ticket. Its price applies to every season period below.</p>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="ticket-row-add">+ Add ticket</button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered ticket-batch-table mb-2">
+              <thead class="thead-light">
+                <tr>
+                  <th>Ticket label</th><th>Price</th>
+                  <th>Min. age</th><th>Max. age</th><th>Country</th><th>Municipality</th>
+                  <th>Student</th><th>Museum pass</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="ticket-batch-rows"></tbody>
+            </table>
+          </div>
+          <input type="hidden" name="ticket_rows" value="[]">
+        </div>
+
         <h6 class="mb-1">Prices</h6>
-        <p class="small text-muted mb-2">
+        <p class="small text-muted mb-2" id="ticket-season-help">
           Leave the dates empty if the price is valid all year. To sell the same ticket at different prices in
           different seasons, add a price for each one.
         </p>
         <div id="ticket-seasons">{{ season_row(0) }}</div>
         <p class="mt-2"><button type="button" class="btn btn-sm btn-outline-secondary" id="season-add">+ Add a price for another season</button></p>
-
-        <details data-fields="min_age max_age resident_country resident_municipality is_student">
-          <summary>Who it's for</summary>
-          <div class="form-row mt-2">
-            <div class="form-group col-md-2">
-              <label>Min. age</label>
-              <input class="form-control" type="number" min="0" name="min_age">
-            </div>
-            <div class="form-group col-md-2">
-              <label>Max. age</label>
-              <input class="form-control" type="number" min="0" name="max_age">
-            </div>
-            <div class="form-group col-md-2">
-              <label>Country</label>
-              <input class="form-control" maxlength="2" name="resident_country" placeholder="PT">
-            </div>
-            <div class="form-group col-md-4">
-              <label>Municipality</label>
-              <input class="form-control" name="resident_municipality">
-            </div>
-            <div class="form-group col-md-2 d-flex align-items-end">
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" name="is_student" value="1" id="tk-student">
-                <label class="form-check-label" for="tk-student">Student</label>
-              </div>
-            </div>
-          </div>
-        </details>
 
         <details data-fields="schedule_kind start_time end_time">
           <summary>Only on certain days or times</summary>
@@ -355,6 +358,27 @@
 </div>
 
 <template id="ticket-season-template">{{ season_row("__i__") }}</template>
+<template id="ticket-batch-row-template">
+  <tr>
+    <td><input class="form-control form-control-sm" data-field="label" maxlength="100" placeholder="e.g. Standard"></td>
+    <td><input class="form-control form-control-sm" data-field="price" inputmode="decimal" placeholder="0.00"></td>
+    <td><input class="form-control form-control-sm" type="number" min="0" data-field="min_age"></td>
+    <td><input class="form-control form-control-sm" type="number" min="0" data-field="max_age"></td>
+    <td><input class="form-control form-control-sm" maxlength="2" data-field="resident_country" placeholder="PT"></td>
+    <td><input class="form-control form-control-sm" data-field="resident_municipality"></td>
+    <td class="text-center"><input type="checkbox" data-field="is_student" aria-label="Student ticket"></td>
+    <td>
+      <select class="form-control form-control-sm" data-field="pass_id">
+        <option value="">None</option>
+        {% for p in ticket_passes %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+      </select>
+    </td>
+    <td class="text-nowrap">
+      <button type="button" class="btn btn-sm btn-outline-secondary ticket-row-duplicate" title="Duplicate row">Copy</button>
+      <button type="button" class="btn btn-sm btn-outline-danger ticket-row-remove" title="Remove row">&times;</button>
+    </td>
+  </tr>
+</template>
 <script type="application/json" id="tickets-data">{{ tickets_data | tojson }}</script>
 
 <script>
@@ -370,9 +394,13 @@
     var bulk = document.getElementById("tickets-bulk-form");
     var seasons = document.getElementById("ticket-seasons");
     var seasonTemplate = document.getElementById("ticket-season-template");
+    var batchRows = document.getElementById("ticket-batch-rows");
+    var batchRowTemplate = document.getElementById("ticket-batch-row-template");
+    var ticketRowsInput = form.elements.ticket_rows;
     var preview = document.getElementById("ticket-preview");
     var url = form.dataset.url;
     var mode = "add";
+    var batchMode = true;
     var nextSeason = 1;
 
     var PLAIN = ["label", "currency", "pass_id", "notes", "entry_policy", "validity", "validity_value",
@@ -410,10 +438,41 @@
       });
     }
 
+    function addBatchRow(values, afterRow) {
+      var fragment = batchRowTemplate.content.cloneNode(true);
+      var row = fragment.querySelector("tr");
+      Object.keys(values || {}).forEach(function (name) {
+        var field = row.querySelector('[data-field="' + name + '"]');
+        if (field) {
+          if (field.type === "checkbox") field.checked = !!values[name];
+          else field.value = values[name] == null ? "" : values[name];
+        }
+      });
+      if (afterRow && afterRow.parentNode === batchRows) afterRow.after(row);
+      else batchRows.appendChild(row);
+      return row;
+    }
+
+    function readBatchRows() {
+      return Array.prototype.map.call(batchRows.querySelectorAll("tr"), function (row) {
+        var values = {};
+        row.querySelectorAll("[data-field]").forEach(function (field) {
+          values[field.dataset.field] = field.type === "checkbox" ? field.checked : field.value;
+        });
+        return values;
+      });
+    }
+
+    function syncBatchRows() {
+      ticketRowsInput.value = JSON.stringify(readBatchRows());
+    }
+
     function openModal(kind, id) {
       mode = kind;
+      batchMode = kind === "add";
       form.reset();
       seasons.querySelectorAll(".season-row:not(:first-child)").forEach(function (row) { row.remove(); });
+      batchRows.innerHTML = "";
       nextSeason = 1;
       preview.innerHTML = "";
 
@@ -430,14 +489,29 @@
 
       form.elements.ticket_id.value = kind === "edit" ? id : "";
       document.getElementById("ticket-modal-title").textContent =
-        kind === "edit" ? "Edit ticket" : kind === "duplicate" ? "Duplicate ticket" : "Add ticket";
+        kind === "edit" ? "Edit ticket" : kind === "duplicate" ? "Duplicate ticket" : "Add tickets";
       document.getElementById("ticket-delete").hidden = kind !== "edit";
+      document.getElementById("ticket-single-fields").hidden = batchMode;
+      document.getElementById("ticket-single-pass").hidden = batchMode;
+      document.getElementById("ticket-batch-editor").hidden = !batchMode;
+      form.querySelectorAll(".ticket-single-audience, .student-single-field").forEach(function (el) { el.hidden = batchMode; });
+      form.querySelectorAll(".season-price-field").forEach(function (el) { el.hidden = batchMode; });
       document.getElementById("season-add").hidden = kind === "edit";   // editing changes one row
+      document.getElementById("season-add").textContent = batchMode
+        ? "+ Add another shared season period" : "+ Add a price for another season";
+      document.getElementById("ticket-season-help").textContent = batchMode
+        ? "Season dates apply to every ticket row. Each row's price is used for every season period."
+        : "Leave the dates empty if the price is valid all year. To sell the same ticket at different prices in different seasons, add a price for each one.";
+      if (batchMode) addBatchRow();
+      syncBatchRows();
       sync();
       openFilledSections();
       $(modalEl).one("shown.bs.modal", function () {
-        form.elements.label.focus();
-        if (kind === "duplicate") form.elements.label.select();
+        if (batchMode) batchRows.querySelector('[data-field="label"]').focus();
+        else {
+          form.elements.label.focus();
+          if (kind === "duplicate") form.elements.label.select();
+        }
       });
       $(modalEl).modal("show");
     }
@@ -458,7 +532,12 @@
       Object.keys(extra || {}).forEach(function (k) { body.append(k, extra[k]); });
       send(body, function (res) {
         if (res.saved) location.reload();
-        else box.innerHTML = res.html;
+        else {
+          box.innerHTML = res.html;
+          // The preview sits at the bottom of the scrollable modal body, below the
+          // fold: scroll it into view, otherwise it looks like nothing happened.
+          box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
       });
     }
 
@@ -476,8 +555,34 @@
     form.addEventListener("input", function (e) { if (e.target.name === "currency") sync(); });
 
     form.querySelectorAll("[data-ticket]").forEach(function (button) {
-      button.addEventListener("click", function () { post(form, button.dataset.ticket, {}, preview); });
+      button.addEventListener("click", function () {
+        if (batchMode) syncBatchRows();
+        var action = batchMode ? "batch_" + button.dataset.ticket : button.dataset.ticket;
+        post(form, action, {}, preview);
+      });
     });
+
+    document.getElementById("ticket-row-add").addEventListener("click", function () {
+      addBatchRow();
+      syncBatchRows();
+    });
+    batchRows.addEventListener("click", function (e) {
+      var row = e.target.closest("tr");
+      if (!row) return;
+      if (e.target.closest(".ticket-row-duplicate")) {
+        var values = {};
+        row.querySelectorAll("[data-field]").forEach(function (field) {
+          values[field.dataset.field] = field.type === "checkbox" ? field.checked : field.value;
+        });
+        addBatchRow(values, row);
+      } else if (e.target.closest(".ticket-row-remove")) {
+        row.remove();
+        if (!batchRows.querySelector("tr")) addBatchRow();
+      }
+      syncBatchRows();
+    });
+    batchRows.addEventListener("input", syncBatchRows);
+    batchRows.addEventListener("change", syncBatchRows);
 
     document.getElementById("ticket-delete").addEventListener("click", function () {
       if (!confirm("Delete this ticket?")) return;
@@ -486,7 +591,11 @@
       body.append("selected", form.elements.ticket_id.value);
       if (form.elements.csrf_token) body.append("csrf_token", form.elements.csrf_token.value);
       send(body, function (res) {
-        if (res.saved) location.reload(); else preview.innerHTML = res.html;
+        if (res.saved) location.reload();
+        else {
+          preview.innerHTML = res.html;
+          preview.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
       });
     });
 

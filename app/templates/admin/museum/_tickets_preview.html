@@ -35,7 +35,12 @@
   </table>
   {% if not errors %}
     <p class="text-muted small mb-0">
-      {{ plan_rows | length }} ticket{{ 's' if plan_rows | length != 1 }} will be {{ 'created' if plan_rows[0].status == 'new' else 'updated' }}. Press Save to confirm.
+      {% if ticket_count is defined %}
+        {{ ticket_count }} ticket{{ 's' if ticket_count != 1 }} ({{ plan_rows | length }} seasonal price{{ 's' if plan_rows | length != 1 }}) will be created.
+      {% else %}
+        This ticket will be {{ 'created' if plan_rows[0].status == 'new' else 'updated' }} with {{ plan_rows | length }} seasonal price{{ 's' if plan_rows | length != 1 }}.
+      {% endif %}
+      Press Save to confirm.
     </p>
   {% endif %}
 {% endif %}
